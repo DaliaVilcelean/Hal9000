@@ -1,0 +1,49 @@
+%include "lib.yasm"
+
+global SyscallEntry
+
+extern SyscallHandler
+extern RestoreRegisters
+
+align 0x10, db 0x0
+[bits 64]
+SyscallEntry:
+    ; RCX <- Will contain UM RIP
+    ; R11 <- Will contain UM RFLAGS
+    ; RFLAGS <- UM RFLAGS & ~(IA32_FMASK)
+    ; CS.Selector = IA32_STAR[47:32]
+    ; SS.Selector = IA32_STAR[47:32] + 0x8
+
+    ; Save RIP in RDI (non-volatile register)
+    mov     rdi, rcx
+
+    mov     ecx, IA32_GS_BASE_MSR
+    rdmsr
+
+    shl     rdx, 0x20
+    or      rdx, rax
+
+    ; Store user-stack in RCX
+    mov     rcx, rsp
+
+    ; => we have KM stack
+    mov     rsp, [rdx + 0x8]
+
+    ; save current UM state (w/ RAX and RSP clobbered)
+    save_proc_state
+
+    mov             rcx, rsp
+    call_func_64    SyscallHandler
+
+    mov             rcx, rsp
+    call            RestoreRegisters
+
+    ; restore user stack in RSP
+    mov             rsp, rcx
+
+    ; RCX <- RIP
+    mov             rcx, rdi
+
+    ; sysretq (YASM seems to be incapable of adding the REX.W prefix)
+    db 0x48
+    sysret

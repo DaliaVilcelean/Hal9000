@@ -1,0 +1,409 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{79A21DCA-19AF-4F8E-9B83-62D7CF504104}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>HAL9000</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(SolutionDir)..\tools\vsyasm\vsyasm.props" />
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)..\bin\$(PlatformName)\$(Configuration)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)..\temp\$(PlatformName)\$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetName>HAL9000</TargetName>
+    <TargetExt>.bin</TargetExt>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
+    <EmbedManifest>false</EmbedManifest>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)..\bin\$(PlatformName)\$(Configuration)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)..\temp\$(PlatformName)\$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetName>HAL9000</TargetName>
+    <TargetExt>.bin</TargetExt>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
+    <EmbedManifest>false</EmbedManifest>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>X64;AMD64;DEBUG;_DEBUG;WIN64</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <CompileAsManaged>false</CompileAsManaged>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ExceptionHandling>false</ExceptionHandling>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <EnableParallelCodeGeneration>false</EnableParallelCodeGeneration>
+      <FloatingPointExceptions>false</FloatingPointExceptions>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <OpenMPSupport>false</OpenMPSupport>
+      <EnablePREfast>true</EnablePREfast>
+      <AdditionalIncludeDirectories>headers;..\shared\common;..\shared\kernel;..\..\acpi\inc;..\commonlib\inc;..\HAL\inc;..\SwapFS\inc;..\FAT32\inc;..\PE_Parser\inc;..\Eth_82574L\inc;..\NetworkStack\inc;..\Disk\inc;..\Volume\inc;..\Ata\inc</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4313;4474;4476;4477;</DisableSpecificWarnings>
+      <ShowIncludes>false</ShowIncludes>
+      <MinimalRebuild>false</MinimalRebuild>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
+      <StringPooling>true</StringPooling>
+      <OmitFramePointers>true</OmitFramePointers>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+    </ClCompile>
+    <Link>
+      <SubSystem>Native</SubSystem>
+      <GenerateDebugInformation>Debug</GenerateDebugInformation>
+      <OutputFile>$(OutDir)\HAL9000.bin</OutputFile>
+      <AdditionalDependencies>HAL.lib;CommonLib.lib;FAT32.lib;SwapFS.lib;PE_Parser.lib;Eth_82574L.lib;NetworkStack.lib;NetworkPort.lib;Disk.lib;Volume.lib;Ata.lib;Acpica.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
+      <GenerateMapFile>true</GenerateMapFile>
+      <MapFileName>$(OutDir)\HAL9000.map</MapFileName>
+      <MapExports>true</MapExports>
+      <EntryPointSymbol>__EntryMultiboot</EntryPointSymbol>
+      <BaseAddress>0xFFFF800001000000</BaseAddress>
+      <FixedBaseAddress>true</FixedBaseAddress>
+      <AdditionalOptions>/ALIGN:0x200 /IGNORE:4108 /MERGE:.mboot=.text %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\HAL;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\FAT32;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\SwapFS;$(SolutionDir)..\acpi\bin\$(PlatformName)\$(ConfigurationName);$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\commonlib;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\PE_Parser;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\Eth_82574L;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\NetworkStack;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\NetworkPort;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\Disk;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\Volume;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\Ata</AdditionalLibraryDirectories>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
+    </Link>
+    <YASM>
+      <Defines>DEBUG</Defines>
+      <AdditionalOptions>-f x64 -X vc -w %(AdditionalOptions)</AdditionalOptions>
+      <Debug>true</Debug>
+    </YASM>
+    <PostBuildEvent>
+      <Command>..\..\postbuild\post_hv.cmd $(ProjectName) "$(SolutionDir)" $(PlatformName) $(ConfigurationName) $(ProjectName)  $(TargetName) $(TargetExt)</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <PreprocessorDefinitions>X64;AMD64;NDEBUG;WIN64</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <CompileAsManaged>false</CompileAsManaged>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ExceptionHandling>false</ExceptionHandling>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <EnableParallelCodeGeneration>false</EnableParallelCodeGeneration>
+      <FloatingPointExceptions>false</FloatingPointExceptions>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <OpenMPSupport>false</OpenMPSupport>
+      <EnablePREfast>true</EnablePREfast>
+      <AdditionalIncludeDirectories>headers;..\shared\common;..\shared\kernel;..\..\acpi\inc;..\commonlib\inc;..\HAL\inc;..\SwapFS\inc;..\FAT32\inc;..\PE_Parser\inc;..\Eth_82574L\inc;..\NetworkStack\inc;..\Disk\inc;..\Volume\inc;..\Ata\inc</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4313;4474;4476;4477;</DisableSpecificWarnings>
+      <ShowIncludes>false</ShowIncludes>
+      <MinimalRebuild>false</MinimalRebuild>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <StringPooling>true</StringPooling>
+      <OmitFramePointers>
+      </OmitFramePointers>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
+    <Link>
+      <SubSystem>Native</SubSystem>
+      <GenerateDebugInformation>Debug</GenerateDebugInformation>
+      <OutputFile>$(OutDir)\HAL9000.bin</OutputFile>
+      <AdditionalDependencies>HAL.lib;CommonLib.lib;FAT32.lib;SwapFS.lib;PE_Parser.lib;Eth_82574L.lib;NetworkStack.lib;NetworkPort.lib;Disk.lib;Volume.lib;Ata.lib;Acpica.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
+      <GenerateMapFile>true</GenerateMapFile>
+      <MapFileName>$(OutDir)\HAL9000.map</MapFileName>
+      <MapExports>true</MapExports>
+      <EntryPointSymbol>__EntryMultiboot</EntryPointSymbol>
+      <BaseAddress>0xFFFF800001000000</BaseAddress>
+      <FixedBaseAddress>true</FixedBaseAddress>
+      <AdditionalOptions>/ALIGN:0x200 /IGNORE:4108 /MERGE:.mboot=.text %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\HAL;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\FAT32;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\SwapFS;$(SolutionDir)..\acpi\bin\$(PlatformName)\Debug;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\commonlib;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\PE_Parser;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\Eth_82574L;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\NetworkStack;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\NetworkPort;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\Disk;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\Volume;$(SolutionDir)..\bin\$(PlatformName)\$(ConfigurationName)\Ata</AdditionalLibraryDirectories>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
+    </Link>
+    <YASM>
+      <Defines>DEBUG</Defines>
+      <AdditionalOptions>-f x64 -X vc %(AdditionalOptions)</AdditionalOptions>
+      <Debug>true</Debug>
+    </YASM>
+    <PostBuildEvent>
+      <Command>..\..\postbuild\post_hv.cmd $(ProjectName) "$(SolutionDir)" $(PlatformName) $(ConfigurationName) $(ProjectName)  $(TargetName) $(TargetExt)</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\acpi_interface.c" />
+    <ClCompile Include="src\acpi_osl.c" />
+    <ClCompile Include="src\ap_tramp.c" />
+    <ClCompile Include="src\boot_module.c" />
+    <ClCompile Include="src\cmd_basic.c" />
+    <ClCompile Include="src\cmd_proc_helper.c" />
+    <ClCompile Include="src\dmp_process.c" />
+    <ClCompile Include="src\process.c" />
+    <ClCompile Include="src\cmd_fs_helper.c" />
+    <ClCompile Include="src\cmd_interpreter.c" />
+    <ClCompile Include="src\cmd_net_helper.c" />
+    <ClCompile Include="src\cmd_sys_helper.c" />
+    <ClCompile Include="src\cmd_thread_helper.c" />
+    <ClCompile Include="src\core.c" />
+    <ClCompile Include="src\cpumu.c" />
+    <ClCompile Include="src\display.c" />
+    <ClCompile Include="src\dmp_ata.c" />
+    <ClCompile Include="src\dmp_cmos.c" />
+    <ClCompile Include="src\dmp_common.c" />
+    <ClCompile Include="src\dmp_cpu.c" />
+    <ClCompile Include="src\dmp_disk.c" />
+    <ClCompile Include="src\dmp_int15.c" />
+    <ClCompile Include="src\dmp_io.c" />
+    <ClCompile Include="src\dmp_ioapic.c" />
+    <ClCompile Include="src\dmp_lapic.c" />
+    <ClCompile Include="src\dmp_mbr.c" />
+    <ClCompile Include="src\dmp_mdl.c" />
+    <ClCompile Include="src\dmp_memory.c" />
+    <ClCompile Include="src\dmp_multiboot.c" />
+    <ClCompile Include="src\dmp_network.c" />
+    <ClCompile Include="src\dmp_net_device.c" />
+    <ClCompile Include="src\dmp_pci.c" />
+    <ClCompile Include="src\dmp_volume.c" />
+    <ClCompile Include="src\dmp_nt.c" />
+    <ClCompile Include="src\Entry64.c" />
+    <ClCompile Include="src\ex.c" />
+    <ClCompile Include="src\ex_event.c" />
+    <ClCompile Include="src\ex_system.c" />
+    <ClCompile Include="src\ex_timer.c" />
+    <ClCompile Include="src\gdtmu.c" />
+    <ClCompile Include="src\hal_assert.c" />
+    <ClCompile Include="src\idt_handlers.c" />
+    <ClCompile Include="src\ioapic_system.c" />
+    <ClCompile Include="src\io_devices.c" />
+    <ClCompile Include="src\iomu.c" />
+    <ClCompile Include="src\io_files.c" />
+    <ClCompile Include="src\ipc.c" />
+    <ClCompile Include="src\isr.c" />
+    <ClCompile Include="src\keyboard.c" />
+    <ClCompile Include="src\keyboard_utils.c" />
+    <ClCompile Include="src\lapic_system.c" />
+    <ClCompile Include="src\log.c" />
+    <ClCompile Include="src\mdl.c" />
+    <ClCompile Include="src\mmu.c" />
+    <ClCompile Include="src\network_utils.c" />
+    <ClCompile Include="src\perf_framework.c" />
+    <ClCompile Include="src\pmm.c" />
+    <ClCompile Include="src\mutex.c" />
+    <ClCompile Include="src\os_info.c" />
+    <ClCompile Include="src\pci_system.c" />
+    <ClCompile Include="src\print.c" />
+    <ClCompile Include="src\serial_comm.c" />
+    <ClCompile Include="src\smp.c" />
+    <ClCompile Include="src\syscall.c" />
+    <ClCompile Include="src\test_priority_donation.c" />
+    <ClCompile Include="src\test_priority_scheduler.c" />
+    <ClCompile Include="src\test_process.c" />
+    <ClCompile Include="src\test_timer.c" />
+    <ClCompile Include="src\um_application.c" />
+    <ClCompile Include="src\system.c" />
+    <ClCompile Include="src\system_driver.c" />
+    <ClCompile Include="src\test_bitmap.c" />
+    <ClCompile Include="src\test_common.c" />
+    <ClCompile Include="src\test_dma.c" />
+    <ClCompile Include="src\test_file_io.c" />
+    <ClCompile Include="src\test_net_stack.c" />
+    <ClCompile Include="src\test_pmm.c" />
+    <ClCompile Include="src\test_thread.c" />
+    <ClCompile Include="src\test_vmm.c" />
+    <ClCompile Include="src\thread.c" />
+    <ClCompile Include="src\os_time.c" />
+    <ClCompile Include="src\vmm.c" />
+    <ClCompile Include="src\vm_reservation_space.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\shared\common\mem_structures.h" />
+    <ClInclude Include="..\shared\common\process_defs.h" />
+    <ClInclude Include="..\shared\common\syscall_defs.h" />
+    <ClInclude Include="..\shared\common\syscall_func.h" />
+    <ClInclude Include="..\shared\common\syscall_no.h" />
+    <ClInclude Include="..\shared\common\thread_defs.h" />
+    <ClInclude Include="..\shared\kernel\cpu_structures.h" />
+    <ClInclude Include="..\shared\kernel\ex.h" />
+    <ClInclude Include="..\shared\kernel\ex_event.h" />
+    <ClInclude Include="..\shared\kernel\filesystem.h" />
+    <ClInclude Include="..\shared\kernel\heap_tags.h" />
+    <ClInclude Include="..\shared\kernel\io.h" />
+    <ClInclude Include="..\shared\kernel\io_structures.h" />
+    <ClInclude Include="..\shared\kernel\log.h" />
+    <ClInclude Include="..\shared\kernel\network.h" />
+    <ClInclude Include="..\shared\kernel\network_device.h" />
+    <ClInclude Include="..\shared\kernel\network_packets.h" />
+    <ClInclude Include="..\shared\kernel\network_utils.h" />
+    <ClInclude Include="..\shared\kernel\pci_system.h" />
+    <ClInclude Include="..\shared\kernel\thread.h" />
+    <ClInclude Include="headers\acpi_interface.h" />
+    <ClInclude Include="headers\ap_tramp.h" />
+    <ClInclude Include="headers\boot_module.h" />
+    <ClInclude Include="headers\cmd_basic.h" />
+    <ClInclude Include="headers\cmd_common.h" />
+    <ClInclude Include="headers\cmd_fs_helper.h" />
+    <ClInclude Include="headers\cmd_net_helper.h" />
+    <ClInclude Include="headers\cmd_proc_helper.h" />
+    <ClInclude Include="headers\cmd_sys_helper.h" />
+    <ClInclude Include="headers\cmd_thread_helper.h" />
+    <ClInclude Include="headers\core.h" />
+    <ClInclude Include="headers\dmp_ata.h" />
+    <ClInclude Include="headers\dmp_common.h" />
+    <ClInclude Include="headers\dmp_int15.h" />
+    <ClInclude Include="headers\dmp_io.h" />
+    <ClInclude Include="headers\dmp_disk.h" />
+    <ClInclude Include="headers\dmp_ioapic.h" />
+    <ClInclude Include="headers\dmp_lapic.h" />
+    <ClInclude Include="headers\dmp_mbr.h" />
+    <ClInclude Include="headers\dmp_memory.h" />
+    <ClInclude Include="headers\dmp_network.h" />
+    <ClInclude Include="headers\dmp_net_device.h" />
+    <ClInclude Include="headers\dmp_nt.h" />
+    <ClInclude Include="headers\dmp_pci.h" />
+    <ClInclude Include="headers\dmp_process.h" />
+    <ClInclude Include="headers\dmp_volume.h" />
+    <ClInclude Include="headers\dmp_mdl.h" />
+    <ClInclude Include="headers\process.h" />
+    <ClInclude Include="headers\process_internal.h" />
+    <ClInclude Include="headers\ex_system.h" />
+    <ClInclude Include="headers\ex_timer.h" />
+    <ClInclude Include="headers\gdtmu.h" />
+    <ClInclude Include="headers\hal_assert.h" />
+    <ClInclude Include="headers\cmd_interpreter.h" />
+    <ClInclude Include="headers\cpumu.h" />
+    <ClInclude Include="headers\display.h" />
+    <ClInclude Include="headers\dmp_cmos.h" />
+    <ClInclude Include="headers\dmp_cpu.h" />
+    <ClInclude Include="headers\dmp_multiboot.h" />
+    <ClInclude Include="headers\HAL9000.h" />
+    <ClInclude Include="headers\idt_handlers.h" />
+    <ClInclude Include="headers\ioapic_system.h" />
+    <ClInclude Include="headers\iomu.h" />
+    <ClInclude Include="headers\ipc.h" />
+    <ClInclude Include="headers\isr.h" />
+    <ClInclude Include="headers\keyboard.h" />
+    <ClInclude Include="headers\keyboard_utils.h" />
+    <ClInclude Include="headers\lapic_system.h" />
+    <ClInclude Include="headers\mdl.h" />
+    <ClInclude Include="headers\mmu.h" />
+    <ClInclude Include="headers\os_time.h" />
+    <ClInclude Include="headers\perf_framework.h" />
+    <ClInclude Include="headers\pmm.h" />
+    <ClInclude Include="headers\multiboot.h" />
+    <ClInclude Include="headers\mutex.h" />
+    <ClInclude Include="headers\os_info.h" />
+    <ClInclude Include="headers\print.h" />
+    <ClInclude Include="headers\scan_codes.h" />
+    <ClInclude Include="headers\serial_comm.h" />
+    <ClInclude Include="headers\smp.h" />
+    <ClInclude Include="headers\synch.h" />
+    <ClInclude Include="headers\syscall.h" />
+    <ClInclude Include="headers\system.h" />
+    <ClInclude Include="headers\system_driver.h" />
+    <ClInclude Include="headers\test_bitmap.h" />
+    <ClInclude Include="headers\test_common.h" />
+    <ClInclude Include="headers\test_dma.h" />
+    <ClInclude Include="headers\test_file_io.h" />
+    <ClInclude Include="headers\test_net_stack.h" />
+    <ClInclude Include="headers\test_pmm.h" />
+    <ClInclude Include="headers\test_priority_donation.h" />
+    <ClInclude Include="headers\test_priority_scheduler.h" />
+    <ClInclude Include="headers\test_process.h" />
+    <ClInclude Include="headers\test_thread.h" />
+    <ClInclude Include="headers\test_timer.h" />
+    <ClInclude Include="headers\test_vmm.h" />
+    <ClInclude Include="headers\thread_internal.h" />
+    <ClInclude Include="headers\um_application.h" />
+    <ClInclude Include="headers\vmm.h" />
+    <ClInclude Include="headers\vm_reservation_space.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <YASM Include="src\_mboot32.yasm">
+      <FileType>Document</FileType>
+    </YASM>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="HAL9000.ruleset" />
+    <YASM Include="src\_syscall.yasm">
+      <FileType>Document</FileType>
+    </YASM>
+    <None Include="src\defines.yasm" />
+    <YASM Include="src\_thread.yasm">
+      <FileType>Document</FileType>
+    </YASM>
+    <YASM Include="src\_trampoline.yasm">
+      <FileType>Document</FileType>
+    </YASM>
+    <YASM Include="src\_transition.yasm">
+      <FileType>Document</FileType>
+    </YASM>
+    <YASM Include="src\_exports.yasm">
+      <FileType>Document</FileType>
+    </YASM>
+    <YASM Include="src\_isr.yasm">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </YASM>
+    <None Include="src\lib.yasm" />
+    <YASM Include="src\_low_mem.yasm">
+      <FileType>Document</FileType>
+    </YASM>
+    <None Include="src\macros.yasm" />
+    <None Include="src\structs.yasm" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(SolutionDir)..\tools\vsyasm\vsyasm.targets" />
+  </ImportGroup>
+</Project>

@@ -1,0 +1,39 @@
+%include "lib.yasm"
+
+global RestoreRegisters
+
+align 0x10, db 0
+[bits 64]
+; void __cdecl* RestoreRegisters( PROCESSOR_STATE* ProcessorState )
+RestoreRegisters:
+    mov     rbx,    rcx
+
+    AlignAddressUpper   rbx, XSAVE_AREA_REQUIRED_ALIGNMENT
+
+%if INCLUDE_FP_SUPPORT
+    mov     edx,    0xFFFFFFFF
+    mov     eax,    edx
+
+    xrstor  QWORD   [rbx]
+%endif
+
+    mov     Rax,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rax]
+    mov     Rdx,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rdx]
+    mov     Rbx,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rbx]
+    mov     Rbp,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rbp]
+    mov     Rsi,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rsi]
+    mov     Rdi,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rdi]
+
+    mov     R8,     [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R8]
+    mov     R9,     [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R9]
+    mov     R10,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R10]
+    mov     R11,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R11]
+    mov     R12,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R12]
+    mov     R13,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R13]
+    mov     R14,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R14]
+    mov     R15,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R15]
+
+    ; we leave rcx at the very end so we will still have a valid pointer
+    mov     Rcx,    [rcx+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rcx]
+
+    ret

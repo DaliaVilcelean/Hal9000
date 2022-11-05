@@ -1,0 +1,127 @@
+%ifndef _STRUCTS_ASM_
+%define _STRUCTS_ASM_
+
+;-----------------------------------------------------------------------;
+; STRUCTURE DEFINITIONS
+;-----------------------------------------------------------------------;
+
+
+struc ASM_PARAMETERS
+    .MultibootInformation               resq    1                           ; 0x00
+    .KernelBaseAddress                  resq    1                           ; 0x08
+    .KernelSize                         resq    1                           ; 0x10
+    .VirtualToPhysicalOffset            resq    1                           ; 0x18
+    .MemoryMapAddress                   resq    1                           ; 0x20
+    .MemoryMapEntries                   resd    1                           ; 0x28
+    .BiosSerialPorts                    resw    4                           ; 0x2C
+                                                                            ; 0x34
+endstruc
+
+struc XSAVE_LEGACY_REGION
+    .ControlWord                        resw    1                           ; 0x00
+    .StatusWord                         resw    1                           ; 0x02
+    .TagWord                            resb    1                           ; 0x04
+    .Reserved1                          resb    1                           ; 0x05
+    .ErrorOpcode                        resw    1                           ; 0x06
+    .ErrorOffset                        resd    1                           ; 0x08
+    .ErrorSelector                      resw    1                           ; 0x0C
+    .Reserved2                          resw    1                           ; 0x0E
+    .DataOffset                         resd    1                           ; 0x10
+    .DataSelector                       resw    1                           ; 0x14
+    .Reserved3                          resw    1                           ; 0x16
+    .MxCsr                              resd    1                           ; 0x18
+    .MxCsr_Mask                         resd    1                           ; 0x1C
+    .FloatRegisters                     resq    16;                         ; 0x20
+    .XmmRegisters                       resq    32;                         ; 0xA0
+    .Reserved4                          resb    96;                         ; 0x1A0
+                                                                            ; 0x200
+endstruc
+
+struc XSAVE_AREA_HEADER
+    .Mask                               resq    1                           ; 0x00
+    .Reserved                           resq    7                           ; 0x08
+                                                                            ; 0x40
+endstruc
+
+%define XSAVE_AREA_REQUIRED_ALIGNMENT           0x40
+
+struc XSAVE_AREA
+    .LegacyState                        resb    XSAVE_LEGACY_REGION_size    ; 0x00
+    .Header                             resb    XSAVE_AREA_HEADER_size      ; 0x200
+
+    .__Reserved                         resb    0x1C0                       ; 0x240
+                                                                            ; 0x400
+endstruc
+
+struc REGISTER_AREA
+    .Rax                                resq    1
+    .Rcx                                resq    1
+    .Rdx                                resq    1
+    .Rbx                                resq    1
+    .Rsp                                resq    1
+    .Rbp                                resq    1
+    .Rsi                                resq    1
+    .Rdi                                resq    1
+    .R8                                 resq    1
+    .R9                                 resq    1
+    .R10                                resq    1
+    .R11                                resq    1
+    .R12                                resq    1
+    .R13                                resq    1
+    .R14                                resq    1
+    .R15                                resq    1
+
+    .Rip                                resq    1
+    .Rflags                             resq    1
+endstruc
+
+struc COMPLETE_PROCESSOR_STATE
+    .XsaveArea                          resb    XSAVE_AREA_size
+
+    .RegisterArea                       resb    REGISTER_AREA_size
+endstruc
+
+; 4 byte aligned
+struc DISK_ADDRESS_PACKET
+    .Size                               resb    1
+    .Reserved                           resb    1
+    .SectorsToTransfer                  resw    1
+    .BufferOffset                       resw    1       ; 2 byte aligned
+    .BufferSegment                      resw    1
+    .StartingLBA                        resd    1
+    .UpperLBAPart                       resd    1
+endstruc
+
+struc INT15_MEMORY_MAP_ENTRY
+    .BaseAddress                        resq    1
+    .Length                             resq    1
+    .Type                               resd    1
+    .ExtendedAttributes                 resd    1
+endstruc
+
+struc TRANSITION_CONFIG
+    .GdtrPhysicalAddress                resd    1
+    .StackPhysicalAddress               resd    1
+    .Pml4PhysicalAddress                resd    1
+    .CodeSelector                       resw    1
+    .DataSelector                       resw    1
+    .StackVirtualAddress                resq    1
+endstruc
+
+struc SYSTEM_CONFIG
+    .LowGdt                             resb    6
+    .HighGdt                            resb    10
+    .Pml4PhysicalAddress                resd    1
+    .Code32Selector                     resw    1
+    .Data32Selector                     resw    1
+    .Code64Selector                     resw    1
+    .Data64Selector                     resw    1
+endstruc
+
+struc AP_CONFIG_ENTRY
+    .StackPhysicalAddress               resd    1
+    .Reserved0                          resd    1
+    .StackVirtualAddress                resq    1
+endstruc
+
+%endif ; _MACROS_ASM_

@@ -1,0 +1,44 @@
+%include "lib.yasm"
+
+global ThreadSwitch
+global ThreadStart
+
+extern RestoreRegisters
+extern ThreadCleanupPostSchedule
+
+align 0x10, db 0
+[bits 64]
+; void __cdecl* ThreadSwitch( OUT_PTR PVOID* OldStack, IN PVOID NewStack )
+ThreadSwitch:
+    save_proc_state
+
+    mov     rax,        rcx
+    mov     [rcx],      rsp
+    sfence
+
+    mov     rsp,        rdx
+    mov     rcx,        rsp
+
+    call    RestoreRegisters
+
+    ; restore stack
+    add     rsp,        COMPLETE_PROCESSOR_STATE_size
+
+    ret
+
+align 0x10, db 0
+[bits 64]
+; void __cdecl* ThreadStart( IN PVOID Function, IN_OPT PVOID Context)
+ThreadStart:
+    ; rsi and rdi are non-volatile registers, save the parameters there
+    mov     rsi, rcx
+    mov     rdi, rdx
+
+    call_func_64    ThreadCleanupPostSchedule
+
+    mov     rcx, rsi
+    mov     rdx, rdi
+
+    ; This iretq will lead us to _ThreadKernelFunction for kernel-mode code
+    ; and to the __start or __start_thread functions for user-mode code
+    iretq

@@ -1,0 +1,8 @@
+%ifndef _LIB_ASM_
+%define _LIB_ASM_
+
+%include "macros.yasm"
+%include "defines.yasm"
+%include "structs.yasm"
+
+%endif ; _LIB_ASM_

@@ -1,0 +1,205 @@
+%include "lib.yasm"
+
+global PM32_to_PM64
+global PM32_to_PM64End
+global PM64_to_PM32
+global ApAsmStub
+
+; This function is the one to which HalActivateFpu returns to,
+; it's responsibility is to get rid of the shadow space and of
+; setting the return functions first (and only) parameter in RCX
+align 0x10, db 0
+ApAsmStub:
+    [bits 64]
+    add     rsp, 0x20
+
+    mov     rcx, [rsp + 0x10]
+
+    ret
+
+; this function takes the processor from 32 bit PM to 64 bit PM
+; we must be in PM32 with Paging disabled when we call this function
+; step1 : disable paging was already done when function was called
+; void __cdecl PM32_to_PM64 (TRANSITION_CONFIG* transitionConfig)
+align 0x10, db 0
+PM32_to_PM64:
+    [bits 32]
+    push        0
+    pushfd
+
+    cli                     ; disable interrupts
+
+    mov     ebx,    ecx
+
+    ; step 2
+    ; enable PAE CR4.PAE = 1
+    mov     eax,    cr4
+    or      eax,    CR4_PAE
+    mov     cr4,    eax
+
+    ; step 3
+    ; load CR3 with phycal base address of PML4
+    mov     eax,    [ebx + TRANSITION_CONFIG.Pml4PhysicalAddress]
+    mov     cr3,    eax
+
+    ; step 4
+    ; Set IA32_EFER.LME = 1
+    ; also enable NX functionality
+    mov     ecx, IA32_EFER
+    rdmsr
+    or      eax, ( IA32_EFER_LME | IA32_EFER_NXE )
+    wrmsr
+
+    mov     eax, [ebx + TRANSITION_CONFIG.GdtrPhysicalAddress]
+
+    ; load the new GDT and go to real 64-bit mode
+    lgdt    [eax]
+
+    ; step 5
+    ; enable paging
+    mov     eax, cr0
+    or      eax, (CR0_PG | CR0_WP | CR0_NE) ; use WP, also clear CD and NW in case
+    and     eax, ~(CR0_CD | CR0_NW )        ; those flags are set
+    mov     cr0, eax
+
+    ; Vol 3B 8.3
+    ; When an instruction is executed that enables or disables paging (that is,
+    ; changes the PG flag in control register CR0), the instruction should be
+    ; followed by a jump instruction
+
+    ; The Pentium 4, Intel Xeon, and P6 family processors do not require
+    ; the jump operation following the move to register CR0 (because any use of the MOV instruction in a Pentium 4,
+    ; Intel Xeon, or P6 family processor to write to CR0 is completely serializing). However, to maintain backwards
+    ; and forward compatibility with code written to run on other IA-32 processors, it is recommended that the jump
+    ; operation be performed.
+
+    ; CONCLUSION: because we will be running on new processors, we DON't need a jump
+
+;
+; now we should be in 64-bit compatibility mode
+;
+[BITS 64]
+    mov     rcx, [rsp]              ; we save the flags
+    mov     edx, DWORD [rsp+8]      ; we need to add the VA address base
+
+    ; set the cs
+    mov     esp, [rbx + TRANSITION_CONFIG.StackPhysicalAddress]
+    sub     esp, TRANSITION_CONFIG_size
+
+    xor     eax, eax
+    mov     ax,  [rbx + TRANSITION_CONFIG.CodeSelector]
+    push    rax                     ; this is a MUST, because retf will pop out 4 bytes for CS (OPE found out this ;-)
+                                    ; and 'push rax' actually means 'push eax', because we still run in 32 bit compat mode
+    call    $ + 5                   ; place return EIP onto the stack
+    mov     eax, 10                 ; instrux length to continue right after 'retf'
+    add     [rsp], eax
+    retf                            ; actually a retfq ( also uses CS saved on stack besides RA )
+
+;
+; we are in true 64-bit code, but still using the identity mappings, NOT the final 1T VA
+;
+    ; set also fs, gs
+    ; NOTE: ds, es, ss are NOT used on x64
+    mov     ax, [rbx + TRANSITION_CONFIG.DataSelector]
+    mov     fs, ax
+    mov     gs, ax
+
+    ; TOFIND: should SS be 0 in x64?
+[bits 32]
+    mov     ss, ax
+[bits 64]
+    mov     rsp, [rbx + TRANSITION_CONFIG.StackVirtualAddress]
+    sub     rsp, TRANSITION_CONFIG_size
+
+    ; switch to final 1T virtual addresses (0x0000`0100`0000`0000)
+    call    $ + 5                   ; place return RIP onto the stack
+    mov     rax, KERNEL_BASE_VIRTUAL - KERNEL_BASE
+    add     qword [rsp], rax
+    add     qword [rsp], 0x14       ; instrux length to continue right after 'retn'
+    retn
+
+    push    rcx
+    popfq                           ; we restore the original flags
+
+    mov     rcx, rdx                            ; PA's 32Mb-64Mb are mapped to 1T+
+    sub     rcx, KERNEL_BASE                    ; that's why we subtract the KERNEL_BASE
+    mov     rdx, QWORD KERNEL_BASE_VIRTUAL      ; so that we get the VA pointing to the same
+    add     rdx, rcx                            ; PA
+
+    add     rsp, TRANSITION_CONFIG_size
+    push    rdx
+
+    ret
+PM32_to_PM64End:
+
+; void __cdecl PM64_to_PM32 (CPU_CONFIG_ENTRY* cpuConfigEntry)
+align 0x10, db 0
+PM64_to_PM32:
+[bits 64]
+    ; we are in true 64 bit mode using 1T+ VA's
+    mov     rbx,    rcx
+
+    ; first step we should go back to the identity mappings
+    mov     rbp,    [rsp]       ; we save original RA
+    mov     esp,    [rbx + TRANSITION_CONFIG.StackPhysicalAddress]
+    sub     esp,    TRANSITION_CONFIG_size
+
+    ; now we are using identity mappings
+    xor     eax, eax
+    mov     ax, [rbx + TRANSITION_CONFIG.CodeSelector]
+    push    rax                     ; this is a MUST, because retf will pop out 4 bytes for CS (OPE found out this ;-)
+                                    ; and 'push rax' actually means 'push eax', because we still run in 32 bit compat mode
+
+    call    $ + 5                   ; place return EIP onto the stack
+
+    mov     rax,  ( KERNEL_BASE - KERNEL_BASE_VIRTUAL ) + 15                ; instrux length to continue right after 'retf'
+    add     [rsp], eax
+    retf                            ; actually a retfq ( also uses CS saved on stack besides RA )
+
+    ; now we are in compatibility mode
+
+    mov     rax,    cr0
+    and     eax,    ~( CR0_CD | CR0_NW | CR0_PG )       ; disable Paging, CD and NW
+    mov     cr0,    rax
+
+    ; Set IA32_EFER.LME = 0
+    mov     ecx, IA32_EFER
+    rdmsr
+    and      eax, ~IA32_EFER_LME
+    wrmsr
+
+    ; We also need to disable PAE
+    mov     rax,    cr4
+    and     eax,    ~( CR4_PAE )
+    mov     cr4,    rax
+
+    xor     eax, eax
+    mov     ax, [rbx + TRANSITION_CONFIG.CodeSelector]
+    push    rax                     ; this is a MUST, because retf will pop out 4 bytes for CS (OPE found out this ;-)
+                                    ; and 'push rax' actually means 'push eax', because we still run in 32 bit compat mode
+    call    $ + 5                   ; place return EIP onto the stack
+    mov     eax, 10                 ; instrux length to continue right after 'retf'
+    add     [rsp], eax
+    retf                            ; actually a retfq ( also uses CS saved on stack besides RA )
+[bits 32]
+    .bits32:
+
+    ; set the data descriptors
+    mov     ax, [ebx + TRANSITION_CONFIG.DataSelector]
+    mov     ds, ax
+    mov     es, ax
+    mov     ss, ax
+    mov     fs, ax
+    mov     gs, ax
+
+    xor     eax,    eax             ; According to Vol3 9.9.2 placing a zero in CR3
+    mov     cr3,    eax             ; forces a TLB flush
+
+    add     esp,    TRANSITION_CONFIG_size
+    push    ebp
+
+    ; we must subtract the difference (it will only substract the low DWORD)
+    mov     eax,    DWORD( KERNEL_BASE - KERNEL_BASE_VIRTUAL )
+    add     [esp],  eax                                     ; VA to the appropriate PA
+
+    ret

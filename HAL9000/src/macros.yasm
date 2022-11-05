@@ -1,0 +1,273 @@
+%ifndef _MACROS_ASM_
+%define _MACROS_ASM_
+
+;-----------------------------------------------------------------------;
+; MACRO DEFINITIONS
+;-----------------------------------------------------------------------;
+
+%macro debug_break 0
+    int 0x3
+%endmacro
+
+%macro bochs_break 0
+    xchg bx, bx
+%endmacro
+
+%macro AlignAddressLower    2
+    push    rax
+
+    mov     rax, QWORD ~(%2 - 1)
+    and     %1, rax
+
+    pop     rax
+%endmacro
+
+%macro AlignAddressUpper    2
+    add     %1, %2 - 1
+    AlignAddressLower       %1, %2
+%endmacro
+
+; This should be used only for x64 calls to C functions
+;
+%macro call_func_64    1-5
+; stack will be either aligned to 0x10 or to 0x8
+; bytes after the PUSH
+
+; NOTE: WE NEED THE PUSH BEFORE THE AND
+; TO BE SURE WE DON'T 'DEALLOCATE' ELEMENTS FROM THE
+; STACK
+
+; Example:
+; RSP <- aligned at 0x10
+; We to AND without sub => still aligned to 0x10
+; We then add 0x8 bytes to RSP (which we didn't allocate)
+; This means 8 bytes are lost from the stack
+    push    rbx
+
+    mov     rbx, 0xF
+    and     rbx, rsp
+
+; align stack to 0x10
+    sub     rsp, rbx
+
+%if %0 > 1
+    mov     rcx, %2
+%endif
+
+%if %0 > 2
+    mov     rdx, %3
+%endif
+
+%if %0 > 3
+    mov     r8, %4
+%endif
+
+%if %0 > 4
+    mov     r9, %5
+%endif
+
+    sub     rsp, 0x20
+; the stack must be aligned at 16 bytes here,
+; not after the call
+    call %1
+
+    add     rsp, 0x20
+
+    add     rsp, rbx
+    pop     rbx
+%endmacro
+
+; this should be used only for 32 bit _cdecl calls
+; Usage:
+; callproc $PROC_NAME $ARG0 ... $ARGN
+%macro callproc 1-*
+    %rep %0 - 1
+        %rotate -1
+        push %1
+    %endrep
+
+    %rotate -1
+    call %1
+
+    ; number of arguments - 1 because the first argument
+    ; is the function name
+    sub     esp, (%0 - 1 ) * 4
+%endmacro
+
+%macro check_vmoperation 0
+    jc          .failedNoError
+    jz          .failedError
+    xor         rax,    rax
+    ret
+.failedNoError:
+    mov         rax,    2
+    ret
+.failedError:
+    mov         rax,    1
+    ret
+%endmacro
+
+; according to MSDN x64 Register Usage
+%macro save_volatiles 0
+    push    r12
+    push    r13
+    push    r14
+    push    r15
+
+    push    rdi
+    push    rsi
+    push    rbx
+    push    rbp
+%endmacro
+
+%macro restore_volatiles 0
+    pop     rbp
+    pop     rbx
+    pop     rsi
+    pop     rdi
+
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
+%endmacro
+
+%macro save_proc_state 0
+    ; allocate local variable on stack
+    sub     rsp,                        COMPLETE_PROCESSOR_STATE_size
+
+    ; save guest GPR's
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rax],  Rax
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rcx],  Rcx
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rdx],  Rdx
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rbx],  Rbx
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rbp],  Rbp
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rsi],  Rsi
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rdi],  Rdi
+
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R8],   R8
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R9],   R9
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R10],  R10
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R11],  R11
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R12],  R12
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R13],  R13
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R14],  R14
+    mov     [rsp+COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.R15],  R15
+
+    mov     rbx, rsp
+
+    AlignAddressUpper   rbx, XSAVE_AREA_REQUIRED_ALIGNMENT
+
+%if INCLUDE_FP_SUPPORT
+    cld
+    lea     rdi, [rbx + XSAVE_AREA.Header]
+    mov     rcx, XSAVE_AREA_HEADER_size / 8
+    xor     eax, eax
+    rep     stosq
+
+    mov     edx, 0xFFFFFFFF
+    mov     eax, edx
+
+    xsave   QWORD [rbx]
+%endif
+
+    ; restore RBX, RCX, RDX and RDI
+    mov     rbx, [rsp + COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rbx]
+    mov     rcx, [rsp + COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rcx]
+    mov     rdx, [rsp + COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rdx]
+    mov     rdi, [rsp + COMPLETE_PROCESSOR_STATE.RegisterArea + REGISTER_AREA.Rdi]
+
+%endmacro
+
+;
+; setup_transition_config_16( TRANSITION_CONFIG*, DWORD Gdtr, DWORD StackPA, WORD CodeSelector, WORD DataSelector)
+%macro setup_transition_config_16 5
+    push    eax
+
+    mov     ecx,                                                %1
+
+    mov     eax,                                                %2
+    mov     [ecx + TRANSITION_CONFIG.GdtrPhysicalAddress],      eax
+
+    mov     eax,                                                DWORD %3
+    mov     [ecx + TRANSITION_CONFIG.StackPhysicalAddress],     eax
+
+    mov     ax,                                                 %4
+    mov     [ecx + TRANSITION_CONFIG.CodeSelector],             ax
+
+    mov     ax,                                                 %5
+    mov     [ecx + TRANSITION_CONFIG.DataSelector],             ax
+
+    pop     eax
+%endmacro
+
+;
+; setup_transition_config_32( TRANSITION_CONFIG*, DWORD Gdtr, DWORD StackPA, WORD CodeSelector, WORD DataSelector, DWORD StackVALow, DWORD StackVAHigh)
+%macro setup_transition_config_32 8
+    push    eax
+
+    mov     ecx,                                                %1
+
+    mov     eax,                                                DWORD %2
+    mov     [ecx + TRANSITION_CONFIG.GdtrPhysicalAddress],      eax
+
+    mov     eax,                                                DWORD %3
+    mov     [ecx + TRANSITION_CONFIG.StackPhysicalAddress],     eax
+
+    mov     ax,                                                 WORD %4
+    mov     [ecx + TRANSITION_CONFIG.CodeSelector],             ax
+
+    mov     ax,                                                 WORD %5
+    mov     [ecx + TRANSITION_CONFIG.DataSelector],             ax
+
+    mov     eax,                                                DWORD %6
+    mov     [ecx + TRANSITION_CONFIG.StackVirtualAddress],      eax
+
+    mov     eax,                                                DWORD %7
+    mov     [ecx + TRANSITION_CONFIG.StackVirtualAddress + 4],  eax
+
+    mov     eax,                                                DWORD %8
+    mov     [ecx + TRANSITION_CONFIG.Pml4PhysicalAddress],      eax
+
+    pop     eax
+%endmacro
+
+;
+; setup_transition_config_64( TRANSITION_CONFIG*, DWORD Gdtr, DWORD StackPA, WORD CodeSelector, WORD DataSelector, QWORD StackVA)
+%macro setup_transition_config_64 6
+    push    rax
+
+    mov     rcx,                                                        %1
+
+    mov     [rcx + TRANSITION_CONFIG.GdtrPhysicalAddress],      DWORD   %2
+    mov     [rcx + TRANSITION_CONFIG.StackPhysicalAddress],     DWORD   %3
+    mov     [rcx + TRANSITION_CONFIG.CodeSelector],             WORD    %4
+    mov     [rcx + TRANSITION_CONFIG.DataSelector],             WORD    %5
+
+    mov     rax,                                                        %6
+    mov     [rcx + TRANSITION_CONFIG.StackVirtualAddress],      rax
+
+    pop     rax
+%endmacro
+
+%macro retrieve_config_addresses 0
+    ; retrieve APIC ID
+    mov     eax, CPUID_FEATURE_INFORMATION
+    cpuid
+
+    shr     ebx, 24
+    ; we will now have in bx the CPU's APIC ID
+
+    and     ebx, 0xFF
+
+    ; we multiply ebx by 0x10
+    ; i.e the size of the AP_CONFIG_ENTRY structure size
+    shl     ebx, 4
+
+    mov     ecx, TRAMPOLINE_AP_DESCRIPTOR_ADDRESS               ; ecx <- PSYSTEM_CONFIG
+    lea     edx, [ecx + ebx + SYSTEM_CONFIG_size]               ; edx <- &PSYSTEM_CONFIG->ApEntries[ApicId]
+
+    mov     ebx, ecx
+%endmacro
+
+%endif ; _MACROS_ASM_

@@ -1,0 +1,124 @@
+%include "lib.yasm"
+
+global TrampolineStart
+global PM32_to_PM64_PlaceHolder
+global LowGdtTable
+global LowGdtTableEnd
+
+extern PM32_to_PM64
+
+LowGdtTable:                                                ; GDT to be filled by C code
+    times        0x80 db 'G'
+LowGdtTableEnd
+
+[bits 16]
+TrampolineStart:
+    wbinvd      ; invalidate caches
+    cli         ; disable interrupts
+
+    cld         ; we don't want any surprises
+
+    jmp     0:TRAMPOLINE_MEMORY_TRAMP_START + ( TrampolineStart.reloadCs - TrampolineStart )
+.reloadCs:
+    ; this is where the jump will take us
+    xor     ax, ax
+    mov     ds, ax
+    mov     es, ax
+    mov     gs, ax
+    mov     fs, ax
+
+    retrieve_config_addresses
+
+    xor     ax, ax
+    mov     ah, [edx + AP_CONFIG_ENTRY.StackPhysicalAddress + 2]
+    mov     ss, ax
+    mov     sp, [edx + AP_CONFIG_ENTRY.StackPhysicalAddress]
+
+    sub     sp, TRANSITION_CONFIG_size
+    mov     cx, sp
+
+    mov     esi, ebx
+    add     esi, SYSTEM_CONFIG.LowGdt
+
+    setup_transition_config_16 ecx, esi, [edx + AP_CONFIG_ENTRY.StackPhysicalAddress], [ebx + SYSTEM_CONFIG.Code32Selector], [ebx + SYSTEM_CONFIG.Data32Selector]
+
+.callPreBits32:
+    ; here we call PM16_to_PM32
+    call    $+(TrampolineStart.end - TrampolineStart.callPreBits32)
+.bits32:
+[bits 32]
+    retrieve_config_addresses
+
+    ; we are in 32-bits
+    sub     esp,                                                TRANSITION_CONFIG_size
+    mov     ecx,                                                esp
+
+    mov     esi,                                                ebx
+    add     esi,                                                SYSTEM_CONFIG.HighGdt
+
+    setup_transition_config_32 ecx, esi, [edx + AP_CONFIG_ENTRY.StackPhysicalAddress], [ebx + SYSTEM_CONFIG.Code64Selector], [ebx + SYSTEM_CONFIG.Data64Selector], [edx + AP_CONFIG_ENTRY.StackVirtualAddress], [edx + AP_CONFIG_ENTRY.StackVirtualAddress + 4], [ebx + SYSTEM_CONFIG.Pml4PhysicalAddress]
+.callPreBits64:
+    call    $+(RM16_to_PM32.end - TrampolineStart.callPreBits64)
+[bits 64]
+    ; we are in 64-bits
+    ; the stack will be set up by the C code
+    ; so all that we'll do is a return
+    ; after we placed the first (and only) function parameter in rcx
+    mov     rcx,            [rsp + 0x10]
+    ret
+
+    hlt
+.end:
+
+; this function goes from 16 bit RM to 32 bit PM
+; ( will be copied in LOWER_MEMORY_ADDRESS + (PM32_to_RM16.end - PM32_to_RM16 ) )
+; LOW_RM16_PM32_ADDRESS
+; void __cdecl RM16_to_PM32(TRANSITION_CONFIG* transitionConfig)
+RM16_to_PM32:
+    [bits 16]
+    ;   use PUSHFD
+    ;   because flags is only 16 bit while EFLAGS will be 32bit
+    pushfd                      ;   save current flags
+    cli
+
+    mov     ebx,    ecx
+
+    mov     eax,    [ebx + TRANSITION_CONFIG.GdtrPhysicalAddress]
+
+    lgdt    [eax]                       ;   set the GDT
+
+    mov     eax,    cr0
+    or      al,     (CR0_PE|CR0_NE)     ;   set PE and NE flag
+    and     eax,    ~(CR0_CD|CR0_NW)    ;   and clear CD and NW
+    mov     cr0,    eax
+
+    mov     ax, [ebx + TRANSITION_CONFIG.CodeSelector]
+
+    push    ax
+    mov     eax, TRAMPOLINE_MEMORY_TRAMP_START + ( RM16_to_PM32.bits32 - TrampolineStart )
+    push    ax
+
+    retf ; We'll return to the next instruction at .bits32
+.bits32:
+    [bits 32]                   ;   we're in 32 bits
+    mov     ax,     [ebx + TRANSITION_CONFIG.DataSelector]
+    mov     ds,     ax
+    mov     es,     ax          ;   set the data descriptors
+    mov     ss,     ax
+    mov     fs,     ax
+    mov     gs,     ax
+
+    popfd                       ;   restore flags
+
+    ; save RA
+    movzx   edx,    WORD [esp]
+    mov     esp,    [ebx + TRANSITION_CONFIG.StackPhysicalAddress]         ; we set new stack
+
+    push    edx
+
+    ret
+.end
+
+[bits 64]
+PM32_to_PM64_PlaceHolder:
+    db 'ARNOLD'

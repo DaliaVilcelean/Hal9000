@@ -1,0 +1,246 @@
+%include "lib.yasm"
+
+global CallToRM
+global LowGdtBase
+
+LowGdtBase:
+.gdt_size           dw  ( LowGdtTable.end - LowGdtTable - 1 )
+.gdt_address        dq  LOW_GDT_BASE_ADDRESS + 0x10
+
+align               0x8,    db 'a'
+
+LowGdtTable:                                                ; GDT with 1+6 entries
+.null               dq  0
+.data64             dq  GDT_DESC_DATA64                     ; Data segment
+.code64             dq  GDT_DESC_CODE64                     ; Code segment, 64 bit, execute / read, present
+.data32             dq  GDT_DESC_DATA32
+.code32             dq  GDT_DESC_CODE32
+.data16             dq  GDT_DESC_DATA16
+.code16             dq  GDT_DESC_CODE16
+.end
+
+times               (0x100 - ( LowGdtTable.end - LowGdtBase ) ) db 'z'
+; this function goes from 32 bit PM to 16 bit RM  ( will be copied in LOW_PM32_RM16_ADDRESS )
+PM32_to_RM16:
+    [bits 32]       
+    cli                     ; disable interrupts
+
+    lgdt    [LOW_GDT_BASE_ADDRESS]
+    
+    mov     eax,        'TTTT'
+    mov     [0xB8024],  eax
+    
+    jmp     GDT_DESC(LowGdtTable,code16):( LOW_PM32_RM16_ADDRESS + ( PM32_to_RM16.bits16 - PM32_to_RM16 ) )
+.bits16:
+    [bits 16]   
+    mov     ax,     GDT_DESC(LowGdtTable,data16)
+    mov     ds,     ax
+    mov     es,     ax          ;   set the data descriptors
+    mov     ss,     ax
+    mov     fs,     ax
+    mov     gs,     ax
+
+    push    DWORD   REAL_MODE_IVT_BASE
+    push    WORD    REAL_MODE_IVT_LIMIT
+
+    lidt    [esp]
+
+    add     esp,    0x6
+
+    mov     eax,    cr0 
+    and     eax,    ~(CR0_CD | CR0_NW | CR0_PE ) ; protection, CD and NW will now be disabled
+    mov     cr0,    eax
+    
+    jmp     ( 0x0 ):( LOW_PM32_RM16_ADDRESS + ( PM32_to_RM16.seg0 - PM32_to_RM16 ) )
+.seg0:
+
+    xor     ax,     ax
+    mov     ds,     ax
+    mov     es,     ax          ;   set the data descriptors
+    mov     ss,     ax
+    mov     fs,     ax
+    mov     gs,     ax
+
+    ; the ret now only take the RA as 2 bytes and we need to
+    ; free the next 2 bytes too(HIGH WORD of the RA)
+    ret     2               
+.end
+
+times               (0x100 - ( PM32_to_RM16.end - PM32_to_RM16 ) ) db 'p'
+; this function goes from 16 bit RM to 32 bit PM
+; ( will be copied in LOWER_MEMORY_ADDRESS + (PM32_to_RM16.end - PM32_to_RM16 ) )
+; LOW_RM16_PM32_ADDRESS
+; void __stdcall RM16_to_PM32( DWORD OldStack )
+RM16_to_PM32:
+    [bits 16]       
+    ;   use PUSHFD
+    ;   because flags is only 16 bit while EFLAGS will be 32bit
+    pushfd                      ;   save current flags
+    cli
+    
+    lgdt    [LOW_GDT_BASE_ADDRESS]      ;   set the GDT
+
+    mov     eax,    cr0
+    or      al,     (CR0_PE|CR0_NE)     ;   set PE and NE flag 
+    and     eax,    ~(CR0_CD|CR0_NW)    ;   and clear CD and NW
+    mov     cr0,    eax
+    
+    jmp     GDT_DESC(LowGdtTable,code32):( LOW_RM16_PM32_ADDRESS + ( RM16_to_PM32.bits32 - RM16_to_PM32 ) )
+    
+.bits32:
+    [bits 32]                   ;   we're in 32 bits
+    mov     ax,     GDT_DESC(LowGdtTable,data32)
+    mov     ds,     ax
+    mov     es,     ax          ;   set the data descriptors
+    mov     ss,     ax
+    mov     fs,     ax
+    mov     gs,     ax
+
+    popfd                       ;   restore flags
+    
+    ; we should first restore old stack
+    movzx   edx,    WORD [esp]
+    mov     ebx,    [esp+2]
+    mov     esp,    ebx         ; we have the old stack
+    
+    mov     [esp],  edx         ; we don't do a push because we still have
+                                ; the RA from PM32_to_RM16 function
+    
+    ret
+.end
+
+times               (0x100 - ( RM16_to_PM32.end - RM16_to_PM32 ) ) db 'r'
+; __cdecl void proc16 RetrieveInt15Map( WORD BufferSelector, WORD BufferAddress, WORD* NumberOfEntries )
+[bits 16]
+RetrieveInt15Map:
+    push    bp
+    mov     bp,         sp
+    sub     sp,         2
+
+    xor     ax,         ax
+    mov     [esp],      ax
+
+    xor     ebx,        ebx                             ; continuation code
+    
+    mov     ax,         [p16(0)]
+    mov     es,         ax
+
+    mov     ax,         [p16(1)]
+    mov     di,         ax
+
+.loop:
+    mov     eax,        INT15_E820_CODE
+    
+    mov     ecx,        INT15_MEMORY_MAP_ENTRY_size
+    mov     edx,        INT15_E820_SIGNATURE
+
+    sti
+    int     15h
+    jc      .finished
+
+    cmp     eax,        INT15_E820_SIGNATURE
+    jne     .error
+
+    cmp     ecx,        INT15_MEMORY_MAP_ENTRY_MIN_SIZE
+    jl      .error
+
+    cmp     ecx,        INT15_MEMORY_MAP_ENTRY_size
+    jnl     .next_entry
+
+    mov     si,         di
+    add     si,         INT15_MEMORY_MAP_ENTRY_MIN_SIZE
+
+    ; extended attribute
+    mov     eax,        1
+
+    mov     [es:si],    eax
+
+.next_entry:
+    mov     ax,         [esp]
+    inc     ax
+    mov     [esp],      ax
+
+    add     di,         INT15_MEMORY_MAP_ENTRY_size
+
+    test    ebx, ebx
+    jz      .finished
+    jmp     .loop
+.error:
+    mov     ax,         0xB800
+    mov     fs,         ax
+    mov     si,         0x230
+    mov     ax,         'KK'
+    mov     [fs:si],    ax
+
+    cli
+    hlt
+           
+.finished:
+    mov     ax,     [esp]
+    test    ax,     ax
+    jz      .error
+
+    mov     si,     [p16(2)]
+    mov     [si],   ax
+
+    add     sp,     2
+    pop     bp
+
+    cli
+
+    ret     2*3
+.end:
+
+times               (0x100 - ( RetrieveInt15Map.end - RetrieveInt15Map ) ) db 'k'
+CallToRM:
+    [bits 32]
+    push        ebp
+    mov         ebp,     esp
+    pusha
+
+    push    LOW_CALL_TO_RM_ADDRESS + ( CallToRM.bits16 - CallToRM )
+    push    LOW_PM32_RM16_ADDRESS
+    ret
+    [bits 16]
+.bits16:
+    ; here's where all the work will happen
+    mov        cx,     WORD [bp + 3 * 4]        ; cx <- NumberOfParameters
+    
+    xor        si,     si                       ; i = 0
+.setare_param:
+    cmp        si,     cx                       ; i >= NumberOfParameters?
+    jae        .final_bucla                     ; if TRUE end loop
+    
+    dec        cx
+    
+    mov        si,     cx                       ; si <- si * 4
+    shl        si,     2
+    
+    mov        ax,     WORD [bp + 4 * 4 + si]   ; get the (n-i)th parameter
+    
+    xor        si,     si                       ; si <- si / 4
+
+    push    ax                                  ; set parameter (n-i) on the stack
+    
+    jmp        .setare_param
+    
+.final_bucla:
+    call    [bp + 8]                        ; call Proc
+
+    mov     ax,         sp
+    sub     ax,         4
+    push    0x0
+    push    ax        ; we need to substract 4 so after the RET we'll have LOW_MEMORY_STACK_TOP
+
+    push    LOW_CALL_TO_RM_ADDRESS + ( CallToRM.bits32 - CallToRM )
+    jmp     0:LOW_RM16_PM32_ADDRESS
+    [bits 32]
+.bits32:
+    mov     eax,        'TTTT'
+    mov     [0xB8048],  eax
+
+    popa
+
+    pop        ebp
+    ret
+.end:

@@ -1,0 +1,749 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Header Files\base">
+      <UniqueIdentifier>{f1271304-3b07-40d8-bdea-06eb84e5b769}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\boot">
+      <UniqueIdentifier>{c7f61ebc-9c89-4f99-a273-29fa93345a95}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\base\yasm">
+      <UniqueIdentifier>{184b92a8-53a8-445d-861f-6af2c3261dae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\base">
+      <UniqueIdentifier>{a5641916-6b04-4991-be68-3860e2ba28fc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\crt">
+      <UniqueIdentifier>{eb6c84ee-07ba-4554-b698-b7f64e41efbd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\crt">
+      <UniqueIdentifier>{1428de26-c3a7-4a5e-a709-729d85043b3d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\devices">
+      <UniqueIdentifier>{f2692cbf-8aa1-42a3-8480-ca09481e037d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devices">
+      <UniqueIdentifier>{13fe69ec-0674-480a-9655-eede94f57ae1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core">
+      <UniqueIdentifier>{897f9b41-b852-4086-aa4b-dec489648b00}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\debug">
+      <UniqueIdentifier>{724ad1c3-57d4-4d04-a6c8-ace1eb4a0c9c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\debug">
+      <UniqueIdentifier>{3affb06b-d43b-4a76-8c24-bb13b5d45c66}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\core">
+      <UniqueIdentifier>{d8c6bb22-159c-47f5-bbc7-0da718955e53}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\boot">
+      <UniqueIdentifier>{cbc40a89-b8d7-4d57-bfd2-2abed31ac1db}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\debug\test">
+      <UniqueIdentifier>{5b5f3da9-961a-4f9c-b0fb-d1b3b0785b9c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\debug\dump">
+      <UniqueIdentifier>{95795d53-c8d7-4fa4-855c-f7ea217d6cc4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\debug\dump">
+      <UniqueIdentifier>{6e790c7a-9fde-493a-b573-bd8af7ca1517}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\debug\test">
+      <UniqueIdentifier>{b20c2e10-e6b8-4dbb-bb36-62be6ec6c6ea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\devices\abstraction">
+      <UniqueIdentifier>{2344aba6-a2ac-43ed-8ea1-ed3a2853360f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\core\IO subsystem">
+      <UniqueIdentifier>{9a2aeca7-cc84-458d-b63f-cbda7a91a20c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\IO subsystem">
+      <UniqueIdentifier>{2a565696-c37a-4394-b99b-e9d1258c7bdf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\apps">
+      <UniqueIdentifier>{3666b9aa-ede5-47bc-867e-a859e7fdf130}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\apps">
+      <UniqueIdentifier>{338c45d9-afc5-4f91-8565-8bdc657db9fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\executive">
+      <UniqueIdentifier>{c0b078f5-f298-4c0d-9eee-1a5cb4c8fe76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\executive">
+      <UniqueIdentifier>{4d0f6f7b-78a5-43ce-b127-667632eb6460}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\core\memory">
+      <UniqueIdentifier>{89a94e9e-4d34-4747-aca7-98de3dc79d76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\memory">
+      <UniqueIdentifier>{218a3ee7-2c1a-457c-9a7b-c483546f342a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\devices\utils">
+      <UniqueIdentifier>{bd984f90-4d70-4723-aa3f-54fd3bc10388}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\devices\network">
+      <UniqueIdentifier>{8160f6ae-2376-4c71-86f4-b97cba05efa4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\devices\keyboard">
+      <UniqueIdentifier>{1e59bb61-52be-4819-a821-1006c9a028d0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\devices\serial">
+      <UniqueIdentifier>{c3f3def2-20db-468a-a9c0-f445163fb955}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\devices\pci">
+      <UniqueIdentifier>{adb1f87c-6214-489f-ae34-1fd16523d4ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devices\keyboard">
+      <UniqueIdentifier>{c8ab8b54-dc1f-4674-b9c3-c31182a08276}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devices\serial">
+      <UniqueIdentifier>{9d366c5d-9bf0-4518-993b-046ee8c8f7d6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devices\pci">
+      <UniqueIdentifier>{3e07df45-36d8-431a-858f-a5ce31449afd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devices\utils">
+      <UniqueIdentifier>{e2e8a53d-6ec0-4b48-8067-f9b1f79db420}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devices\apic">
+      <UniqueIdentifier>{328116cd-1ef7-45f9-be65-0399f8cb71b1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\devices\apic">
+      <UniqueIdentifier>{2f4a7cb1-890d-45bd-86ad-e45f7db559cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\core\cpu">
+      <UniqueIdentifier>{f9d6e54e-0fb1-47ff-a0a4-965ae339f892}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\cpu">
+      <UniqueIdentifier>{7052ba67-bd0e-44a8-b123-946ebf32006e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\usermode">
+      <UniqueIdentifier>{1297f178-45d7-4074-b254-756c9e3048cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\usermode">
+      <UniqueIdentifier>{f64bf144-4d2f-435d-b4a6-eb97ad5cc35e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\usermode\common">
+      <UniqueIdentifier>{053c5b68-9a55-44a1-b72a-1fe1c1bfd413}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\debug\test\threads">
+      <UniqueIdentifier>{7c2fc4c7-1cfd-40d5-a9af-e5db8b0f99c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\debug\test\threads">
+      <UniqueIdentifier>{b52ea948-2566-400c-a19d-a261a9e532c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\debug\test\userprog">
+      <UniqueIdentifier>{4200718c-b938-4539-a550-ac19802a7103}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\debug\test\userprog">
+      <UniqueIdentifier>{fc25cd91-cea9-4299-9119-b2af14759aad}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\display.c">
+      <Filter>Source Files\base</Filter>
+    </ClCompile>
+    <ClCompile Include="src\print.c">
+      <Filter>Source Files\crt</Filter>
+    </ClCompile>
+    <ClCompile Include="src\os_info.c">
+      <Filter>Source Files\base</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Entry64.c">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_cmos.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_multiboot.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\system.c">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\keyboard_utils.c">
+      <Filter>Source Files\crt</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cmd_interpreter.c">
+      <Filter>Source Files\apps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\log.c">
+      <Filter>Source Files\debug</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_cpu.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\hal_assert.c">
+      <Filter>Source Files\base</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_common.c">
+      <Filter>Source Files\debug\test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cpumu.c">
+      <Filter>Source Files\core\cpu</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gdtmu.c">
+      <Filter>Source Files\core\cpu</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_pci.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_ata.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_memory.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_mbr.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_disk.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_volume.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_io.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\iomu.c">
+      <Filter>Source Files\core\IO subsystem</Filter>
+    </ClCompile>
+    <ClCompile Include="src\io_devices.c">
+      <Filter>Source Files\core\IO subsystem</Filter>
+    </ClCompile>
+    <ClCompile Include="src\io_files.c">
+      <Filter>Source Files\core\IO subsystem</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cmd_fs_helper.c">
+      <Filter>Source Files\apps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\acpi_interface.c">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\acpi_osl.c">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\smp.c">
+      <Filter>Source Files\core\cpu</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ap_tramp.c">
+      <Filter>Source Files\boot</Filter>
+    </ClCompile>
+    <ClCompile Include="src\thread.c">
+      <Filter>Source Files\executive</Filter>
+    </ClCompile>
+    <ClCompile Include="src\mutex.c">
+      <Filter>Source Files\executive</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ex_event.c">
+      <Filter>Source Files\executive</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cmd_thread_helper.c">
+      <Filter>Source Files\apps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_bitmap.c">
+      <Filter>Source Files\debug\test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_int15.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\vmm.c">
+      <Filter>Source Files\core\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pmm.c">
+      <Filter>Source Files\core\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\mmu.c">
+      <Filter>Source Files\core\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_vmm.c">
+      <Filter>Source Files\debug\test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_pmm.c">
+      <Filter>Source Files\debug\test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\mdl.c">
+      <Filter>Source Files\core\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_mdl.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ex.c">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cmd_sys_helper.c">
+      <Filter>Source Files\apps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_dma.c">
+      <Filter>Source Files\debug\test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\perf_framework.c">
+      <Filter>Source Files\debug\test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_nt.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core.c">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_lapic.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\network_utils.c">
+      <Filter>Source Files\devices\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_network.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cmd_net_helper.c">
+      <Filter>Source Files\apps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_net_device.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_net_stack.c">
+      <Filter>Source Files\debug\test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\keyboard.c">
+      <Filter>Source Files\devices\keyboard</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lapic_system.c">
+      <Filter>Source Files\devices\apic</Filter>
+    </ClCompile>
+    <ClCompile Include="src\serial_comm.c">
+      <Filter>Source Files\devices\serial</Filter>
+    </ClCompile>
+    <ClCompile Include="src\system_driver.c">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_common.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ioapic_system.c">
+      <Filter>Source Files\devices\apic</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_ioapic.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pci_system.c">
+      <Filter>Source Files\devices\pci</Filter>
+    </ClCompile>
+    <ClCompile Include="src\os_time.c">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ex_timer.c">
+      <Filter>Source Files\executive</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ex_system.c">
+      <Filter>Source Files\executive</Filter>
+    </ClCompile>
+    <ClCompile Include="src\isr.c">
+      <Filter>Source Files\core\cpu</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ipc.c">
+      <Filter>Source Files\core\cpu</Filter>
+    </ClCompile>
+    <ClCompile Include="src\idt_handlers.c">
+      <Filter>Source Files\core\cpu</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_file_io.c">
+      <Filter>Source Files\debug\test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\um_application.c">
+      <Filter>Source Files\usermode</Filter>
+    </ClCompile>
+    <ClCompile Include="src\process.c">
+      <Filter>Source Files\executive</Filter>
+    </ClCompile>
+    <ClCompile Include="src\vm_reservation_space.c">
+      <Filter>Source Files\core\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dmp_process.c">
+      <Filter>Source Files\debug\dump</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cmd_proc_helper.c">
+      <Filter>Source Files\apps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\syscall.c">
+      <Filter>Source Files\usermode</Filter>
+    </ClCompile>
+    <ClCompile Include="src\boot_module.c">
+      <Filter>Source Files\boot</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cmd_basic.c">
+      <Filter>Source Files\apps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_thread.c">
+      <Filter>Source Files\debug\test\threads</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_timer.c">
+      <Filter>Source Files\debug\test\threads</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_priority_scheduler.c">
+      <Filter>Source Files\debug\test\threads</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_priority_donation.c">
+      <Filter>Source Files\debug\test\threads</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_process.c">
+      <Filter>Source Files\debug\test\userprog</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="headers\HAL9000.h">
+      <Filter>Header Files\base</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\display.h">
+      <Filter>Header Files\base</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\print.h">
+      <Filter>Header Files\crt</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\os_info.h">
+      <Filter>Header Files\base</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_cmos.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\multiboot.h">
+      <Filter>Header Files\boot</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_multiboot.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\system.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\keyboard_utils.h">
+      <Filter>Header Files\crt</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\cmd_interpreter.h">
+      <Filter>Header Files\apps</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_cpu.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\hal_assert.h">
+      <Filter>Header Files\base</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_common.h">
+      <Filter>Header Files\debug\test</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\cpumu.h">
+      <Filter>Header Files\core\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\gdtmu.h">
+      <Filter>Header Files\core\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_pci.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_ata.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_memory.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_mbr.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_disk.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_volume.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_io.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\iomu.h">
+      <Filter>Header Files\core\IO subsystem</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\cmd_fs_helper.h">
+      <Filter>Header Files\apps</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\acpi_interface.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\smp.h">
+      <Filter>Header Files\core\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\ap_tramp.h">
+      <Filter>Header Files\boot</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\mutex.h">
+      <Filter>Header Files\executive</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\cmd_thread_helper.h">
+      <Filter>Header Files\apps</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\synch.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_bitmap.h">
+      <Filter>Header Files\debug\test</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_int15.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\vmm.h">
+      <Filter>Header Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\pmm.h">
+      <Filter>Header Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\mmu.h">
+      <Filter>Header Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_vmm.h">
+      <Filter>Header Files\debug\test</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_pmm.h">
+      <Filter>Header Files\debug\test</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\mdl.h">
+      <Filter>Header Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_mdl.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_file_io.h">
+      <Filter>Header Files\debug\test</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\cmd_sys_helper.h">
+      <Filter>Header Files\apps</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_dma.h">
+      <Filter>Header Files\debug\test</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\perf_framework.h">
+      <Filter>Header Files\debug\test</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_nt.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\core.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_lapic.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_network.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\cmd_net_helper.h">
+      <Filter>Header Files\apps</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_net_device.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_net_stack.h">
+      <Filter>Header Files\debug\test</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\keyboard.h">
+      <Filter>Header Files\devices\keyboard</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\scan_codes.h">
+      <Filter>Header Files\devices\keyboard</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\lapic_system.h">
+      <Filter>Header Files\devices\apic</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\serial_comm.h">
+      <Filter>Header Files\devices\serial</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\system_driver.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_common.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\ioapic_system.h">
+      <Filter>Header Files\devices\apic</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_ioapic.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\os_time.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\ex_timer.h">
+      <Filter>Header Files\executive</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\ex_system.h">
+      <Filter>Header Files\executive</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\ipc.h">
+      <Filter>Header Files\core\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\idt_handlers.h">
+      <Filter>Header Files\core\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\isr.h">
+      <Filter>Header Files\core\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\thread_internal.h">
+      <Filter>Header Files\executive</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\um_application.h">
+      <Filter>Header Files\usermode</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\process.h">
+      <Filter>Header Files\executive</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\process_internal.h">
+      <Filter>Header Files\executive</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\vm_reservation_space.h">
+      <Filter>Header Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\dmp_process.h">
+      <Filter>Header Files\debug\dump</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\cmd_proc_helper.h">
+      <Filter>Header Files\apps</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\syscall.h">
+      <Filter>Header Files\usermode</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\common\process_defs.h">
+      <Filter>Header Files\executive</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\common\thread_defs.h">
+      <Filter>Header Files\executive</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\common\syscall_defs.h">
+      <Filter>Header Files\usermode\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\common\syscall_func.h">
+      <Filter>Header Files\usermode\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\common\syscall_no.h">
+      <Filter>Header Files\usermode\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\io.h">
+      <Filter>Header Files\core\IO subsystem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\io_structures.h">
+      <Filter>Header Files\core\IO subsystem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\cpu_structures.h">
+      <Filter>Header Files\core\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\ex_event.h">
+      <Filter>Header Files\executive</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\common\mem_structures.h">
+      <Filter>Header Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\network.h">
+      <Filter>Header Files\devices\network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\network_device.h">
+      <Filter>Header Files\devices\network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\network_packets.h">
+      <Filter>Header Files\devices\network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\pci_system.h">
+      <Filter>Header Files\devices\pci</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\thread.h">
+      <Filter>Header Files\executive</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\network_utils.h">
+      <Filter>Header Files\devices\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\filesystem.h">
+      <Filter>Header Files\devices\abstraction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\heap_tags.h">
+      <Filter>Header Files\crt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\ex.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\kernel\log.h">
+      <Filter>Header Files\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\boot_module.h">
+      <Filter>Header Files\boot</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\cmd_common.h">
+      <Filter>Header Files\apps</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\cmd_basic.h">
+      <Filter>Header Files\apps</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_thread.h">
+      <Filter>Header Files\debug\test\threads</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_timer.h">
+      <Filter>Header Files\debug\test\threads</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_priority_scheduler.h">
+      <Filter>Header Files\debug\test\threads</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_priority_donation.h">
+      <Filter>Header Files\debug\test\threads</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\test_process.h">
+      <Filter>Header Files\debug\test\userprog</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\defines.yasm">
+      <Filter>Header Files\base\yasm</Filter>
+    </None>
+    <None Include="src\lib.yasm">
+      <Filter>Header Files\base\yasm</Filter>
+    </None>
+    <None Include="src\macros.yasm">
+      <Filter>Header Files\base\yasm</Filter>
+    </None>
+    <None Include="src\structs.yasm">
+      <Filter>Header Files\base\yasm</Filter>
+    </None>
+    <None Include="HAL9000.ruleset" />
+  </ItemGroup>
+  <ItemGroup>
+    <YASM Include="src\_mboot32.yasm">
+      <Filter>Source Files\boot</Filter>
+    </YASM>
+    <YASM Include="src\_isr.yasm">
+      <Filter>Source Files\core</Filter>
+    </YASM>
+    <YASM Include="src\_exports.yasm">
+      <Filter>Source Files\core</Filter>
+    </YASM>
+    <YASM Include="src\_transition.yasm">
+      <Filter>Source Files\boot</Filter>
+    </YASM>
+    <YASM Include="src\_trampoline.yasm">
+      <Filter>Source Files\boot</Filter>
+    </YASM>
+    <YASM Include="src\_thread.yasm">
+      <Filter>Source Files\executive</Filter>
+    </YASM>
+    <YASM Include="src\_low_mem.yasm">
+      <Filter>Source Files\boot</Filter>
+    </YASM>
+    <YASM Include="src\_syscall.yasm">
+      <Filter>Source Files\usermode</Filter>
+    </YASM>
+  </ItemGroup>
+</Project>
