@@ -1,4 +1,7 @@
 #pragma once
+#include "ex_event.h"
+#include "list.h"
+#include "lock_common.h"
 
 typedef enum _EX_TIMER_TYPE
 {
@@ -20,7 +23,20 @@ typedef struct _EX_TIMER
 
     volatile BOOLEAN    TimerStarted;
     BOOLEAN             TimerUninited;
-} EX_TIMER, *PEX_TIMER;
+
+    //pastreaza evidenta threadurilor care asteapta un timer -- blocate
+    EX_EVENT            TimerEvent;
+    //folosit pentru a plasa timerul intr-o lista globala de timere
+    LIST_ENTRY          TimerListElem;
+} EX_TIMER, * PEX_TIMER;
+
+struct _GLOBAL_TIMER_LIST
+{
+    LOCK               TimerListLock;
+    LIST_ENTRY         TimerListHead;
+};
+
+static struct _GLOBAL_TIMER_LIST m_globalTimerList;
 
 //******************************************************************************
 // Function:     ExTimerInit
@@ -50,7 +66,7 @@ ExTimerInit(
     OUT     PEX_TIMER       Timer,
     IN      EX_TIMER_TYPE   Type,
     IN      QWORD           TimeUs
-    );
+);
 
 //******************************************************************************
 // Function:     ExTimerStart
@@ -62,7 +78,7 @@ ExTimerInit(
 void
 ExTimerStart(
     IN      PEX_TIMER       Timer
-    );
+);
 
 //******************************************************************************
 // Function:     ExTimerStop
@@ -74,7 +90,7 @@ ExTimerStart(
 void
 ExTimerStop(
     IN      PEX_TIMER       Timer
-    );
+);
 
 //******************************************************************************
 // Function:     ExTimerWait
@@ -87,7 +103,7 @@ ExTimerStop(
 void
 ExTimerWait(
     INOUT   PEX_TIMER       Timer
-    );
+);
 
 //******************************************************************************
 // Function:     ExTimerUninit
@@ -100,7 +116,7 @@ ExTimerWait(
 void
 ExTimerUninit(
     INOUT   PEX_TIMER       Timer
-    );
+);
 
 //******************************************************************************
 // Function:     ExTimerCompareTimers
@@ -115,4 +131,22 @@ INT64
 ExTimerCompareTimers(
     IN      PEX_TIMER     FirstElem,
     IN      PEX_TIMER     SecondElem
-    );
+);
+
+void
+ExTimerSystemPreinit();
+
+INT64
+ExTimerCompareListElems(
+    IN      PLIST_ENTRY     t1,
+    IN      PLIST_ENTRY     t2,
+    IN      PVOID           context
+);
+
+void
+ExTimerCheck(
+    IN      PEX_TIMER      timer
+);
+
+void
+ExTimerCheckAll();
