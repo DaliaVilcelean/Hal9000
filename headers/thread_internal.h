@@ -92,6 +92,14 @@ typedef struct _THREAD
     struct _PROCESS*        Process;
 } THREAD, *PTHREAD;
 
+ //BOOLEAN ThreadComparePriorityReadyList
+//(INOUT PLIST_ENTRY lhs, INOUT PLIST_ENTRY rhs, IN_OPT  PVOID Context);
+
+
+INT64
+ThreadComparePriorityReadyList
+(IN PLIST_ENTRY lhs, IN PLIST_ENTRY rhs, IN_OPT  PVOID Context);
+
 //******************************************************************************
 // Function:     ThreadSystemPreinit
 // Description:  Basic global initialization. Initializes the all threads list,
@@ -282,3 +290,6 @@ void
 ThreadSetPriority(
     IN      THREAD_PRIORITY     NewPriority
     );
+
+
+

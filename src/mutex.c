@@ -2,7 +2,29 @@
 #include "thread_internal.h"
 #include "mutex.h"
 
+
+
 #define MUTEX_MAX_RECURSIVITY_DEPTH         MAX_BYTE
+
+
+   INT64 ThreadComparePriorityReadyList1
+(IN PLIST_ENTRY lhs,IN PLIST_ENTRY rhs, IN_OPT  PVOID Context) {
+
+    PTHREAD pThread1, pThread2;
+
+    ASSERT(lhs != NULL && rhs != NULL);
+    ASSERT(NULL == Context);
+
+    pThread1 = (PTHREAD)CONTAINING_RECORD(lhs, THREAD, ReadyList);
+    pThread2 = (PTHREAD)CONTAINING_RECORD(rhs, THREAD, ReadyList);
+
+    return(pThread1->Priority >= pThread2->Priority);
+
+}
+
+
+
+
 
 _No_competing_thread_
 void
@@ -55,7 +77,15 @@ MutexAcquire(
 
     while (Mutex->Holder != pCurrentThread)
     {
-        InsertTailList(&Mutex->WaitingList, &pCurrentThread->ReadyList);
+        //old
+       // InsertTailList(&Mutex->WaitingList, &pCurrentThread->ReadyList);
+
+        //new
+        InsertOrderedList(&Mutex->WaitingList,
+            &pCurrentThread->ReadyList,
+            ThreadComparePriorityReadyList1,
+            NULL);
+
         ThreadTakeBlockLock();
         LockRelease(&Mutex->MutexLock, dummyState);
         ThreadBlock();

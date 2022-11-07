@@ -9,6 +9,8 @@
 #include "io.h"
 #include "ex_event.h"
 #include "hw_fpu.h"
+#include "thread.h"
+#include <thread_internal.h>
 
 extern void ApAsmStub();
 
@@ -370,22 +372,21 @@ SmpSendPanic(
     LapicSystemSendIpi(0, ApicDeliveryModeFixed, ApicDestinationShorthandAllExcludingSelf, ApicDestinationModePhysical, &vector);
 }
 
+
+
 STATUS
 SmpSendGenericIpi(
-    IN      PFUNC_IpcProcessEvent   BroadcastFunction,
-    IN_OPT  PVOID                   Context,
-    IN_OPT  PFUNC_FreeFunction      FreeFunction,
-    IN_OPT  PVOID                   FreeContext,
-    IN      BOOLEAN                 WaitForHandling
+
     )
 {
     SMP_DESTINATION dest = { 0 };
+   
 
-    return SmpSendGenericIpiEx(BroadcastFunction,
-                               Context,
-                               FreeFunction,
-                               FreeContext,
-                               WaitForHandling,
+    return SmpSendGenericIpiEx(ThreadYieldForIpi,
+                                NULL,
+                               NULL,
+                               NULL,
+                               FALSE,
                                SmpIpiSendToAllExcludingSelf,
                                dest
                                );
