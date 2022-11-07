@@ -240,6 +240,11 @@ ThreadTerminate(
     INOUT   PTHREAD             Thread
     );
 
+
+
+STATUS
+ThreadYieldForIpi(IN      PTHREAD             pThread);
+
 //******************************************************************************
 // Function:     ThreadTakeBlockLock
 // Description:  Takes the block lock for the executing thread. This is required
