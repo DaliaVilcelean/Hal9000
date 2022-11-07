@@ -776,17 +776,8 @@ ThreadGetPriority(
 _No_competing_thread_
 void ThreadSetPriority_Other(
     INOUT     PTHREAD  Thread,
-    IN      THREAD_PRIORITY     NewPriority,
-   IN BOOLEAN forced
+    IN      THREAD_PRIORITY     NewPriority
 ) {
- 
-    if (forced) {
-
-        if (Thread->Priority < NewPriority) {
-            Thread->Priority = NewPriority;
-        }
-        
-    }else  Thread->Priority = NewPriority;
 
     if (Thread->State == ThreadStateReady) {
         RemoveEntryList(&Thread->AllList);
@@ -794,8 +785,6 @@ void ThreadSetPriority_Other(
         InsertOrderedList(&m_threadSystemData.ReadyThreadsList, &Thread->ReadyList,
             ThreadComparePriorityReadyList,
             NULL);
-
-
     }
     else if
         (Thread->State == ThreadStateRunning &&
@@ -816,7 +805,7 @@ ThreadSetPriority(
    // GetCurrentThread()->Priority = NewPriority;
 
     //new 
-    ThreadSetPriority_Other(GetCurrentThread(), NewPriority, TRUE);
+    ThreadSetPriority_Other(GetCurrentThread(), NewPriority);
 }
 
 STATUS
