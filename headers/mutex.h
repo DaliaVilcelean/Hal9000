@@ -32,6 +32,10 @@ MutexInit(
     IN          BOOLEAN     Recursive
     );
 
+INT64
+ThreadComparePriorityReadyList1
+(IN PLIST_ENTRY lhs, IN PLIST_ENTRY rhs, IN_OPT  PVOID Context);
+
 //******************************************************************************
 // Function:     MutexAcquire
 // Description:  Acquires a mutex. If the mutex is currently held the thread
@@ -60,3 +64,5 @@ void
 MutexRelease(
     INOUT       PMUTEX      Mutex
     );
+
+

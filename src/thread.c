@@ -9,6 +9,7 @@
 #include "isr.h"
 #include "gdtmu.h"
 #include "pe_exports.h"
+#include <smp.h>
 
 #define TID_INCREMENT               4
 
@@ -60,6 +61,13 @@ _ThreadInit(
     OUT_PTR     PTHREAD*            Thread,
     IN          BOOLEAN             AllocateKernelStack
     );
+
+
+
+
+
+
+
 
 static
 STATUS
@@ -122,6 +130,7 @@ _ThreadDereference(
 
 static FUNC_FreeFunction            _ThreadDestroy;
 
+
 static
 void
 _ThreadKernelFunction(
@@ -130,6 +139,12 @@ _ThreadKernelFunction(
     );
 
 static FUNC_ThreadStart     _IdleThread;
+
+////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+
+
+
 
 void
 _No_competing_thread_
@@ -140,15 +155,38 @@ ThreadSystemPreinit(
     memzero(&m_threadSystemData, sizeof(THREAD_SYSTEM_DATA));
     m_threadSystemData.ThreadCount = 0;
 
+    LockInit(&m_threadSystemData.AllThreadsLock);
+
     InitializeListHead(&m_threadSystemData.AllThreadsList);
     m_threadSystemData.ThreadCount += 1;
 
-    LockInit(&m_threadSystemData.AllThreadsLock);
+   
+    LockInit(&m_threadSystemData.ReadyThreadsLock);
 
     m_threadSystemData.ThreadCount = 0;
     InitializeListHead(&m_threadSystemData.ReadyThreadsList);
 
-    LockInit(&m_threadSystemData.ReadyThreadsLock);
+
+}
+
+
+
+
+
+INT64
+ThreadComparePriorityReadyList
+(IN PLIST_ENTRY lhs, IN PLIST_ENTRY rhs, IN_OPT  PVOID Context) {
+
+    PTHREAD pThread1, pThread2;
+
+    ASSERT(lhs != NULL && rhs != NULL);
+    ASSERT(NULL == Context);
+
+    pThread1 = (PTHREAD)CONTAINING_RECORD(lhs, THREAD, ReadyList);
+    pThread2 = (PTHREAD)CONTAINING_RECORD(rhs, THREAD, ReadyList);
+
+    return(pThread1->Priority >= pThread2->Priority);
+
 }
 
 STATUS
@@ -282,6 +320,8 @@ ThreadCreate(
     return s;
 }
 
+
+
 STATUS
 ThreadCreateEx(
     IN_Z        char*               Name,
@@ -329,6 +369,8 @@ ThreadCreateEx(
     secondArg = 0;
 
     ASSERT(NULL != pCpu);
+
+    //ASSERT(Priority>=PRI_MIN)
 
     status = _ThreadInit(Name, Priority, &pThread, TRUE);
     LOG("Thread with name %s and pid %u was created\n", pThread->Name, pThread->Id);
@@ -453,6 +495,59 @@ ThreadTick(
     }
 }
 
+STATUS
+ThreadYieldForIpi(IN      PTHREAD             pThread) {
+
+    INTR_STATE dummyState;
+    INTR_STATE oldState;
+    PPCPU pCpu;
+    BOOLEAN bForcedYield;
+
+    ASSERT(NULL != pThread);
+
+    oldState = CpuIntrDisable();
+
+    pCpu = GetCurrentPcpu();
+
+    ASSERT(NULL != pCpu);
+
+    bForcedYield = pCpu->ThreadData.YieldOnInterruptReturn;
+    pCpu->ThreadData.YieldOnInterruptReturn = FALSE;
+
+    if (THREAD_FLAG_FORCE_TERMINATE_PENDING == _InterlockedAnd(&pThread->Flags, MAX_DWORD))
+    {
+        _ThreadForcedExit();
+        NOT_REACHED;
+    }
+
+    LockAcquire(&m_threadSystemData.ReadyThreadsLock, &dummyState);
+    if (pThread != pCpu->ThreadData.IdleThread)
+    {
+        //old
+       // InsertTailList(&m_threadSystemData.ReadyThreadsList, &pThread->ReadyList);
+
+
+        //new
+        InsertOrderedList
+        (&m_threadSystemData.ReadyThreadsList,
+            &pThread->ReadyList,
+            ThreadComparePriorityReadyList
+            , NULL);
+    }
+    if (!bForcedYield)
+    {
+        pThread->TickCountEarly++;
+    }
+    pThread->State = ThreadStateReady;
+    _ThreadSchedule();
+    ASSERT(!LockIsOwner(&m_threadSystemData.ReadyThreadsLock));
+    LOG_TRACE_THREAD("Returned from _ThreadSchedule\n");
+
+    CpuIntrSetState(oldState);
+   
+    return pThread->ExitStatus;
+}
+
 void
 ThreadYield(
     void
@@ -484,7 +579,16 @@ ThreadYield(
     LockAcquire(&m_threadSystemData.ReadyThreadsLock, &dummyState);
     if (pThread != pCpu->ThreadData.IdleThread)
     {
-        InsertTailList(&m_threadSystemData.ReadyThreadsList, &pThread->ReadyList);
+        //old
+       // InsertTailList(&m_threadSystemData.ReadyThreadsList, &pThread->ReadyList);
+
+
+        //new
+        InsertOrderedList
+        (&m_threadSystemData.ReadyThreadsList, 
+            &pThread->ReadyList,
+            ThreadComparePriorityReadyList 
+           , NULL);
     }
     if (!bForcedYield)
     {
@@ -539,7 +643,16 @@ ThreadUnblock(
     ASSERT(ThreadStateBlocked == Thread->State);
 
     LockAcquire(&m_threadSystemData.ReadyThreadsLock, &dummyState);
-    InsertTailList(&m_threadSystemData.ReadyThreadsList, &Thread->ReadyList);
+
+    //Old Implementation
+   // InsertTailList(&m_threadSystemData.ReadyThreadsList, &Thread->ReadyList);
+
+
+    //My Implementation
+    InsertOrderedList(&m_threadSystemData.ReadyThreadsList, &Thread->ReadyList,
+        ThreadComparePriorityReadyList,
+        NULL);
+
     Thread->State = ThreadStateReady;
     LockRelease(&m_threadSystemData.ReadyThreadsLock, dummyState );
     LockRelease(&Thread->BlockLock, oldState);
@@ -660,6 +773,36 @@ ThreadGetPriority(
     return (NULL != pThread) ? pThread->Priority : 0;
 }
 
+_No_competing_thread_
+void ThreadSetPriority_Other(
+    INOUT     PTHREAD  Thread,
+    IN      THREAD_PRIORITY     NewPriority,
+   IN BOOLEAN forced
+) {
+ 
+    if (forced) {
+
+        if (Thread->Priority < NewPriority) {
+            Thread->Priority = NewPriority;
+        }
+        
+    }else  Thread->Priority = NewPriority;
+
+    if (Thread->State == ThreadStateReady) {
+        RemoveEntryList(&Thread->AllList);
+        ThreadSystemPreinit();
+        InsertOrderedList(&m_threadSystemData.ReadyThreadsList, &Thread->ReadyList,
+            ThreadComparePriorityReadyList,
+            NULL);
+    }
+    else if
+        (Thread->State == ThreadStateRunning &&
+            (CONTAINING_RECORD(Thread->AllList.Flink, THREAD, ReadyList))->Priority > NewPriority) {
+        ThreadYield();
+    }
+
+}
+
 void
 ThreadSetPriority(
     IN      THREAD_PRIORITY     NewPriority
@@ -667,7 +810,11 @@ ThreadSetPriority(
 {
     ASSERT(ThreadPriorityLowest <= NewPriority && NewPriority <= ThreadPriorityMaximum);
 
-    GetCurrentThread()->Priority = NewPriority;
+    //old
+   // GetCurrentThread()->Priority = NewPriority;
+
+    //new 
+    ThreadSetPriority_Other(GetCurrentThread(), NewPriority, TRUE);
 }
 
 STATUS
@@ -1106,6 +1253,8 @@ STATUS
     NOT_REACHED;
 }
 
+
+
 REQUIRES_EXCL_LOCK(m_threadSystemData.ReadyThreadsLock)
 static
 _Ret_notnull_
@@ -1246,3 +1395,11 @@ _ThreadKernelFunction(
     ThreadExit(exitStatus);
     NOT_REACHED;
 }
+
+
+
+
+
+
+
+
