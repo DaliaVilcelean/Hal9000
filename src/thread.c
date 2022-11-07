@@ -794,6 +794,8 @@ void ThreadSetPriority_Other(
         InsertOrderedList(&m_threadSystemData.ReadyThreadsList, &Thread->ReadyList,
             ThreadComparePriorityReadyList,
             NULL);
+
+
     }
     else if
         (Thread->State == ThreadStateRunning &&
