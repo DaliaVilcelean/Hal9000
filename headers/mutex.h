@@ -9,6 +9,7 @@ typedef struct _MUTEX
 
     BYTE                CurrentRecursivityDepth;
     BYTE                MaxRecursivityDepth;
+    LIST_ENTRY          AcquiredMutexListElem; // elem in list of mutexes acquired by a thread
 
     _Guarded_by_(MutexLock)
     LIST_ENTRY          WaitingList;

@@ -667,7 +667,10 @@ ThreadSetPriority(
 {
     ASSERT(ThreadPriorityLowest <= NewPriority && NewPriority <= ThreadPriorityMaximum);
 
-    GetCurrentThread()->Priority = NewPriority;
+    GetCurrentThread()->RealPriority = NewPriority;
+    if (GetCurrentThread()->Priority < GetCurrentThread()->RealPriority) {
+        GetCurrentThread()->Priority = NewPriority;
+    }
 }
 
 STATUS
@@ -772,7 +775,7 @@ _ThreadInit(
             LOG_FUNC_ERROR("ExEventInit", status);
             __leave;
         }
-
+       
         if (AllocateKernelStack)
         {
             pStack = MmuAllocStack(STACK_DEFAULT_SIZE, TRUE, FALSE, NULL);
@@ -785,6 +788,7 @@ _ThreadInit(
             pThread->Stack = pStack;
             pThread->InitialStackBase = pStack;
             pThread->StackSize = STACK_DEFAULT_SIZE;
+            pThread->WaitedMutex = NULL;
         }
 
         pThread->Name = ExAllocatePoolWithTag(PoolAllocateZeroMemory, sizeof(char)*(nameLen + 1), HEAP_THREAD_TAG, 0);
@@ -800,9 +804,10 @@ _ThreadInit(
         pThread->Id = _ThreadSystemGetNextTid();
         pThread->State = ThreadStateBlocked;
         pThread->Priority = Priority;
+        pThread->AcquiredMutexesList = *(PLIST_ENTRY)ExAllocatePoolWithTag(PoolAllocateZeroMemory, sizeof(LIST_ENTRY), HEAP_DEFAULT_ALIGNMENT, 0);
+        InitializeListHead(&pThread->AcquiredMutexesList);
 
         LockInit(&pThread->BlockLock);
-
         LockAcquire(&m_threadSystemData.AllThreadsLock, &oldIntrState);
         InsertTailList(&m_threadSystemData.AllThreadsList, &pThread->AllList);
         LockRelease(&m_threadSystemData.AllThreadsLock, oldIntrState);
@@ -1245,4 +1250,37 @@ _ThreadKernelFunction(
 
     ThreadExit(exitStatus);
     NOT_REACHED;
+}
+void ThreadRecomputePriority() {
+    PTHREAD pCurrentThread = GetCurrentThread();
+    THREAD_PRIORITY maxPriority = pCurrentThread->RealPriority;
+
+    PLIST_ITERATOR mutexIterator = ExAllocatePoolWithTag(PoolAllocateZeroMemory, sizeof(LIST_ITERATOR), HEAP_DEFAULT_ALIGNMENT, 0);
+    ListIteratorInit(&pCurrentThread->AcquiredMutexesList, mutexIterator);
+
+    while (mutexIterator != NULL) {
+        PMUTEX mutex = CONTAINING_RECORD(mutexIterator->CurrentEntry, MUTEX, AcquiredMutexListElem);
+        PLIST_ITERATOR waitListIterator = ExAllocatePoolWithTag(PoolAllocateZeroMemory, sizeof(LIST_ITERATOR), HEAP_DEFAULT_ALIGNMENT, 0);
+        ListIteratorInit(&mutex->WaitingList, waitListIterator);
+        while (waitListIterator != NULL) {
+            PTHREAD thread = CONTAINING_RECORD(waitListIterator->CurrentEntry, THREAD, AllList);
+            if (ThreadGetPriority(thread) > maxPriority) {
+                maxPriority = ThreadGetPriority(thread);
+            }
+            ListIteratorNext(waitListIterator);
+        }
+        ListIteratorNext(mutexIterator);
+    }
+    pCurrentThread->Priority = maxPriority;
+}
+void ThreadDonatePriority() {
+    PTHREAD pCurrentThread = GetCurrentThread();
+    PTHREAD mutexHolder = pCurrentThread->WaitedMutex->Holder;
+    
+    while (mutexHolder != NULL) {
+        if (pCurrentThread->Priority > mutexHolder->Priority) {
+            mutexHolder->Priority = pCurrentThread->Priority;
+        }
+        mutexHolder = mutexHolder->WaitedMutex->Holder;
+    }
 }
