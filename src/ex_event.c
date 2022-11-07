@@ -4,6 +4,9 @@
 
 #include "cpumu.h"
 
+
+
+
 STATUS
 ExEventInit(
     OUT     EX_EVENT*     Event,
@@ -97,7 +100,15 @@ ExEventWaitForSignal(
     while (TRUE != _InterlockedCompareExchange8(&Event->Signaled, newState, TRUE))
     {
         LockAcquire(&Event->EventLock, &dummyState);
-        InsertTailList(&Event->WaitingList, &pCurrentThread->ReadyList);
+
+
+        //old
+       // InsertTailList(&Event->WaitingList, &pCurrentThread->ReadyList);
+
+        //new 
+        InsertOrderedList(&Event->WaitingList, &pCurrentThread->ReadyList,
+            ThreadComparePriorityReadyList, NULL);
+
         ThreadTakeBlockLock();
         LockRelease(&Event->EventLock, dummyState);
         ThreadBlock();
