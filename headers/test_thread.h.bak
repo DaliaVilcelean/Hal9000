@@ -1,0 +1,43 @@
+#pragma once
+
+#include "thread.h"
+
+typedef
+void
+(__cdecl FUNC_ThreadTest)(
+    OUT_OPT_PTR     PVOID*              Context
+    );
+
+typedef     FUNC_ThreadTest*            PFUNC_ThreadTest;
+
+
+typedef struct _THREAD_TEST
+{
+    char*               TestName;
+    PFUNC_ThreadStart   ThreadFunction;
+    PFUNC_ThreadTest    ThreadTestFunction;
+} THREAD_TEST, *PTHREAD_TEST;
+
+
+FUNC_ThreadStart    TestThreadYield;
+
+FUNC_ThreadStart    TestMutexes;
+FUNC_ThreadTest     TestPrepareMutexes;
+
+FUNC_ThreadStart    TestCpuIntense;
+
+extern const THREAD_TEST THREADS_TEST[];
+
+extern const DWORD THREADS_TOTAL_NO_OF_TESTS;
+
+void
+TestThreadFunctionality(
+    IN      THREAD_TEST*                ThreadTest,
+    IN_OPT  PVOID                       ContextForTestFunction,
+    IN      DWORD                       NumberOfThreads
+    );
+
+void
+TestAllThreadFunctionalities(
+    IN      DWORD                       NumberOfThreads
+    );

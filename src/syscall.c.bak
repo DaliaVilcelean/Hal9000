@@ -1,0 +1,414 @@
+#include "HAL9000.h"
+#include "syscall.h"
+#include "gdtmu.h"
+//#include "syscall_defs.h"
+#include "syscall_func.h"
+#include "syscall_no.h"
+#include "dmp_cpu.h"
+#include "process.h"
+#include "thread.h"
+//#include "process_internal.h"
+
+#define SYSCALL_IF_VERSION_KM                   0x1
+#define PROCESS_HANDLE_SALT                     11
+
+extern void SyscallEntry();
+
+void
+SyscallHandler(
+    INOUT   PPROCESSOR_STATE    UsermodeProcessorState
+)
+{
+    SYSCALL_ID sysCallId;
+    PQWORD pSyscallParameters;
+    STATUS status;
+
+    // It is NOT ok to setup the FMASK so that interrupts will be enabled when the system call occurs
+    // The issue is that we'll have a user-mode stack and we wouldn't want to receive an interrupt on
+    // that stack. This is why we only enable interrupts here.
+    ASSERT(CpuIntrGetState() == INTR_OFF);
+    CpuIntrSetState(INTR_ON);
+
+    LOG_TRACE_USERMODE("The syscall handler has been called!\n");
+
+    status = STATUS_SUCCESS;
+    pSyscallParameters = NULL;
+
+    PPROCESS caller = GetCurrentProcess();
+
+    __try
+    {
+        if (LogIsComponentTraced(LogComponentUserMode))
+        {
+            DumpProcessorState(UsermodeProcessorState);
+        }
+
+        sysCallId = UsermodeProcessorState->RegisterValues[RegisterR8];
+
+        LOG_TRACE_USERMODE("System call ID is %u\n", sysCallId);
+
+        // The first parameter is the system call ID, we don't care about it => +1
+        pSyscallParameters = (PQWORD)UsermodeProcessorState->RegisterValues[RegisterRbp] + 1;
+
+        switch (sysCallId) {
+        case SyscallIdIdentifyVersion:
+            status = SyscallValidateInterfaceHandler((STATUS)pSyscallParameters[0]);
+            break;
+        case SyscallIdProcessExit:
+            //Validate args
+            SyscallProcessExitHandler((STATUS)pSyscallParameters[0]);
+            break;
+        case SyscallIdProcessCreate:
+            //Validate args
+            if (!ValidateArguments((PVOID)pSyscallParameters[0], pSyscallParameters[1], PAGE_RIGHTS_READ, caller, FALSE)) {
+                status = STATUS_INVALID_PARAMETER1;
+                break;
+            }
+            if (!ValidateArguments((PVOID)pSyscallParameters[2], pSyscallParameters[3], PAGE_RIGHTS_READ, caller, TRUE)) {
+                status = STATUS_INVALID_PARAMETER3;
+                break;
+            }
+            if (!ValidateArguments((PVOID)pSyscallParameters[4], sizeof(UM_HANDLE), PAGE_RIGHTS_READWRITE, caller, FALSE)) {
+                status = STATUS_INVALID_PARAMETER5;
+                break;
+            }
+            status = SyscallProcessCreateHandler((char*)pSyscallParameters[0], pSyscallParameters[1], (char*)pSyscallParameters[2], pSyscallParameters[3], (UM_HANDLE*)pSyscallParameters[4]);
+            break;
+        case SyscallIdProcessGetPid:
+            //Validate args
+            if (!ValidateArguments((PVOID)pSyscallParameters[1], sizeof(PID), PAGE_RIGHTS_READWRITE, caller, FALSE)) {
+                status = STATUS_INVALID_PARAMETER2;
+                break;
+            }
+            status = SyscallProcessGetPidHandler((UM_HANDLE)pSyscallParameters[0], (PID*)pSyscallParameters[1]);
+            break;
+        case SyscallIdProcessWaitForTermination:
+            //Validate args
+            if (!ValidateArguments((PVOID)pSyscallParameters[1], sizeof(STATUS), PAGE_RIGHTS_READWRITE, caller, FALSE)) {
+                status = STATUS_INVALID_PARAMETER2;
+                break;
+            }
+            status = SyscallProcessWaitForTerminationHandler(pSyscallParameters[0], (STATUS*)pSyscallParameters[1]);
+            break;
+        case SyscallIdProcessCloseHandle:
+            //Validate args
+            status = SyscallProcessCloseHandleHandler(pSyscallParameters[0]);
+            break;
+        case SyscallIdFileWrite:
+            //Validate args
+            if (!ValidateArguments((PVOID)pSyscallParameters[1], pSyscallParameters[2], PAGE_RIGHTS_READ, caller, FALSE)) {
+                status = STATUS_INVALID_PARAMETER2;
+                break;
+            }
+            if (!ValidateArguments((PVOID)pSyscallParameters[3], sizeof(QWORD), PAGE_RIGHTS_READWRITE, caller, FALSE)) {
+                status = STATUS_INVALID_PARAMETER4;
+                break;
+            }
+            status = SyscallFileWriteHandler((UM_HANDLE)pSyscallParameters[0], (PVOID)pSyscallParameters[1], (QWORD)pSyscallParameters[2], (QWORD*)pSyscallParameters[3]);
+            break;
+        case SyscallIdThreadExit:
+            status = SyscallThreadExitHandler((STATUS)pSyscallParameters[0]);
+            break;
+        }
+
+    }
+    __finally
+    {
+        LOG_TRACE_USERMODE("Will set UM RAX to 0x%x\n", status);
+
+        UsermodeProcessorState->RegisterValues[RegisterRax] = status;
+
+        CpuIntrSetState(INTR_OFF);
+    }
+}
+
+void
+SyscallPreinitSystem(
+    void
+)
+{
+
+}
+
+STATUS
+SyscallInitSystem(
+    void
+)
+{
+    return STATUS_SUCCESS;
+}
+
+STATUS
+SyscallUninitSystem(
+    void
+)
+{
+    return STATUS_SUCCESS;
+}
+
+void
+SyscallCpuInit(
+    void
+)
+{
+    IA32_STAR_MSR_DATA starMsr;
+    WORD kmCsSelector;
+    WORD umCsSelector;
+
+    memzero(&starMsr, sizeof(IA32_STAR_MSR_DATA));
+
+    kmCsSelector = GdtMuGetCS64Supervisor();
+    ASSERT(kmCsSelector + 0x8 == GdtMuGetDS64Supervisor());
+
+    umCsSelector = GdtMuGetCS32Usermode();
+    /// DS64 is the same as DS32
+    ASSERT(umCsSelector + 0x8 == GdtMuGetDS32Usermode());
+    ASSERT(umCsSelector + 0x10 == GdtMuGetCS64Usermode());
+
+    // Syscall RIP <- IA32_LSTAR
+    __writemsr(IA32_LSTAR, (QWORD)SyscallEntry);
+
+    LOG_TRACE_USERMODE("Successfully set LSTAR to 0x%X\n", (QWORD)SyscallEntry);
+
+    // Syscall RFLAGS <- RFLAGS & ~(IA32_FMASK)
+    __writemsr(IA32_FMASK, RFLAGS_INTERRUPT_FLAG_BIT);
+
+    LOG_TRACE_USERMODE("Successfully set FMASK to 0x%X\n", RFLAGS_INTERRUPT_FLAG_BIT);
+
+    // Syscall CS.Sel <- IA32_STAR[47:32] & 0xFFFC
+    // Syscall DS.Sel <- (IA32_STAR[47:32] + 0x8) & 0xFFFC
+    starMsr.SyscallCsDs = kmCsSelector;
+
+    // Sysret CS.Sel <- (IA32_STAR[63:48] + 0x10) & 0xFFFC
+    // Sysret DS.Sel <- (IA32_STAR[63:48] + 0x8) & 0xFFFC
+    starMsr.SysretCsDs = umCsSelector;
+
+    __writemsr(IA32_STAR, starMsr.Raw);
+
+    LOG_TRACE_USERMODE("Successfully set STAR to 0x%X\n", starMsr.Raw);
+}
+
+BOOLEAN
+ValidateArguments(
+    IN PVOID DataPointer,
+    IN QWORD DataSize,
+    IN PAGE_RIGHTS RequestedRights,
+    IN PPROCESS CurrentProcess,
+    IN BOOLEAN NullAllowed
+)
+{
+    BOOLEAN status = TRUE;
+
+    //IF NullAllowed = TRUE we can permit null pointers (e.g. NULL arguments for process create)
+    if (NullAllowed && (DataPointer == NULL))
+        return status;
+
+    if (!NullAllowed && (DataPointer == NULL))
+    {
+        status = FALSE;
+        return status;
+    }
+
+    STATUS bufferStatus = MmuIsBufferValid(DataPointer, DataSize, RequestedRights, CurrentProcess);
+
+    if (bufferStatus != STATUS_SUCCESS)
+    {
+        status = FALSE;
+    }
+
+
+    return status;
+}
+
+STATUS
+SyscallValidateInterfaceHandler(
+    IN  SYSCALL_IF_VERSION          InterfaceVersion
+) {
+    if (InterfaceVersion == SYSCALL_IF_VERSION_KM)
+        return STATUS_SUCCESS;
+    else return STATUS_INVALID_PARAMETER1;
+}
+
+void
+SyscallProcessExitHandler(
+    IN      STATUS                  ExitStatus
+) {
+    PPROCESS currentProcess = GetCurrentProcess();
+    currentProcess->TerminationStatus = ExitStatus;
+    ProcessTerminate(currentProcess);
+}
+
+STATUS
+SyscallProcessCreateHandler(
+    IN_READS_Z(PathLength)
+    char*               ProcessPath,
+    IN          QWORD               PathLength,
+    IN_READS_OPT_Z(ArgLength)
+    char*               Arguments,
+    IN           QWORD               ArgLength,
+    OUT         UM_HANDLE*          ProcessHandle
+) {
+    PPROCESS newProcess;
+    PPROCESS currentProcess = GetCurrentProcess();
+
+    QWORD a = PathLength;
+    QWORD b = ArgLength;
+    a += b;
+    char newPath[200] = "C:\\APPLIC~1\\";
+
+    if (strrchr(ProcessPath, '\\') == ProcessPath)
+        snprintf(newPath, 200, "C:\\APPLIC~1\\%s", ProcessPath);
+
+    STATUS createStat = ProcessCreateWithParent(newPath, Arguments, currentProcess, &newProcess);
+    if (createStat == STATUS_SUCCESS) {
+        *ProcessHandle = ProcessGetId(newProcess) + PROCESS_HANDLE_SALT;
+        //*ProcessHandle += PROCESS_HANDLE_SALT;
+        //LOG_ERROR("Parent set is: %d\n", newProcess->Parent);
+        return STATUS_SUCCESS;
+    }
+    else {
+        ProcessHandle = 0;
+        return createStat;
+    }
+}
+
+STATUS
+SyscallProcessGetPidHandler(
+    IN_OPT  UM_HANDLE               ProcessHandle,
+    OUT     PID*                    ProcessId
+) {
+    if (ProcessHandle == UM_INVALID_HANDLE_VALUE) {
+        *ProcessId = ProcessGetId(GetCurrentProcess());
+        return STATUS_SUCCESS;
+    }
+    else {
+        PID actualPID = ProcessHandle - PROCESS_HANDLE_SALT;
+        if (FindProcessByPID(actualPID) != NULL) {
+            *ProcessId = actualPID;
+            return STATUS_SUCCESS;
+        }
+        else {
+            *ProcessId = 0;
+            return STATUS_INVALID_PARAMETER1;
+        }
+    }
+}
+
+STATUS
+SyscallProcessWaitForTerminationHandler(
+    IN      UM_HANDLE               ProcessHandle,
+    OUT     STATUS*                 TerminationStatus
+) {
+    if (ProcessHandle == UM_INVALID_HANDLE_VALUE) {
+        return STATUS_INVALID_PARAMETER1;
+    }
+    else {
+        PID actualPID = ProcessHandle - PROCESS_HANDLE_SALT;
+        PPROCESS targetProcess = FindProcessByPID(actualPID);
+        if (targetProcess == NULL) {
+            return STATUS_INVALID_PARAMETER1;
+        }
+        else {
+            PPROCESS caller = GetCurrentProcess();
+            //(targetProcess->Parent==NULL)||
+            if ((targetProcess->Parent == NULL) || (ProcessGetId(targetProcess->Parent) != ProcessGetId(caller))) {
+                return STATUS_INVALID_PARAMETER2;
+            }
+            else {
+                ProcessWaitForTermination(targetProcess, TerminationStatus);
+                /*INTR_STATE state;
+                LockAcquire(&caller->ChildrenListLock, &state);
+                RemoveEntryList(&targetProcess->LinkInParentList);
+                LockRelease(&caller->ChildrenListLock, state);
+                targetProcess->Parent = NULL;
+                ProcessCloseHandle(targetProcess);*/
+                return STATUS_SUCCESS;
+            }
+        }
+    }
+}
+
+STATUS
+SyscallProcessCloseHandleHandler(
+    IN      UM_HANDLE               ProcessHandle
+) {
+    if (ProcessHandle == UM_INVALID_HANDLE_VALUE) {
+        return STATUS_INVALID_PARAMETER1;
+    }
+    else {
+        PID actualPID = ProcessHandle - PROCESS_HANDLE_SALT;
+        PPROCESS targetProcess = FindProcessByPID(actualPID);
+        if (targetProcess == NULL) {
+            return STATUS_INVALID_PARAMETER1;
+        }
+        else {
+            PPROCESS caller = GetCurrentProcess();
+            //(targetProcess->Parent == NULL) || 
+            if ((targetProcess->Parent == NULL) || ProcessGetId(targetProcess->Parent) != ProcessGetId(caller)) {
+                return STATUS_INVALID_PARAMETER2;
+            }
+            else {
+                INTR_STATE state;
+                LockAcquire(&caller->ChildrenListLock, &state);
+                RemoveEntryList(&targetProcess->LinkInParentList);
+                LockRelease(&caller->ChildrenListLock, state);
+                targetProcess->Parent = NULL;
+                ProcessCloseHandle(targetProcess);
+                return STATUS_SUCCESS;
+            }
+        }
+    }
+}
+
+//STATUS
+//SyscallFileCreateHandler(
+//    IN_READS_Z(PathLength)
+//    char*                   Path,
+//    IN          QWORD                   PathLength,
+//    IN          BOOLEAN                 Directory,
+//    IN          BOOLEAN                 Create,
+//    OUT         UM_HANDLE*              FileHandle
+//);
+//
+//STATUS
+//SyscallFileCloseHandler(
+//    IN          UM_HANDLE               FileHandle
+//);
+//
+//STATUS
+//SyscallFileReadHandler(
+//    IN  UM_HANDLE                   FileHandle,
+//    OUT_WRITES_BYTES(BytesToRead)
+//    PVOID                       Buffer,
+//    IN  QWORD                       BytesToRead,
+//    OUT QWORD*                      BytesRead
+//);
+
+STATUS
+SyscallFileWriteHandler(
+    IN  UM_HANDLE                   FileHandle,
+    IN_READS_BYTES(BytesToWrite)
+    PVOID                       Buffer,
+    IN  QWORD                       BytesToWrite,
+    OUT QWORD*                      BytesWritten
+) {
+    if (FileHandle == UM_FILE_HANDLE_STDOUT) {
+        LOG("[%s]:[%s]\n", ProcessGetName(NULL), Buffer);
+        *BytesWritten = BytesToWrite;
+        return STATUS_SUCCESS;
+    }
+    else
+        return STATUS_INVALID_PARAMETER1;
+}
+
+STATUS
+SyscallThreadExitHandler(
+    IN      STATUS                  ExitStatus
+) {
+    STATUS a = ExitStatus;
+    a++;
+    //ProcessTerminate(GetCurrentProcess());
+    ThreadExit(ExitStatus);
+    return STATUS_INVALID_PARAMETER1;
+}
+

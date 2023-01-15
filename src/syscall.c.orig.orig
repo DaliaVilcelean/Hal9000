@@ -1,0 +1,321 @@
+#include "HAL9000.h"
+#include "syscall.h"
+#include "gdtmu.h"
+#include "syscall_defs.h"
+#include "syscall_func.h"
+#include "syscall_no.h"
+#include "dmp_cpu.h"
+#include "process_internal.h"
+#include "process.h"
+#include "thread_internal.h"
+#include "mmu.h"
+#include "iomu.h"
+
+#define SYSCALL_IF_VERSION_KM                   0x1
+
+volatile BOOLEAN SyscallsEnabled = TRUE;
+
+extern void SyscallEntry();
+
+void
+SyscallHandler(
+    INOUT   PPROCESSOR_STATE    UsermodeProcessorState
+    )
+{
+    SYSCALL_ID sysCallId;
+    PQWORD pSyscallParameters;
+    STATUS status;
+
+    // It is NOT ok to setup the FMASK so that interrupts will be enabled when the system call occurs
+    // The issue is that we'll have a user-mode stack and we wouldn't want to receive an interrupt on
+    // that stack. This is why we only enable interrupts here.
+    ASSERT(CpuIntrGetState() == INTR_OFF);
+    CpuIntrSetState(INTR_ON);
+
+    LOG_TRACE_USERMODE("The syscall handler has been called!\n");
+
+    status = STATUS_SUCCESS;
+    pSyscallParameters = NULL;
+
+    __try
+    {
+        if (LogIsComponentTraced(LogComponentUserMode))
+        {
+            DumpProcessorState(UsermodeProcessorState);
+        }
+
+        sysCallId = UsermodeProcessorState->RegisterValues[RegisterR8];
+		LOG_TRACE_USERMODE("System call ID is %u\n", sysCallId);
+
+        // The first parameter is the system call ID, we don't care about it => +1
+        pSyscallParameters = (PQWORD)UsermodeProcessorState->RegisterValues[RegisterRbp] + 1;
+
+		if (!SyscallsEnabled && sysCallId != SyscallIdDisableSyscalls)
+		{
+			return;
+		}
+			
+
+		switch (sysCallId)
+		{
+		case SyscallIdIdentifyVersion:
+			status = HandleSyscallIdIdentifyVersion(pSyscallParameters);
+			break;
+		case SyscallIdProcessCreate:
+			status = HandleSyscallIdProcessCreate(pSyscallParameters);
+			break;
+		case SyscallIdProcessExit:
+			status = HandleSyscallIdProcessExit();
+			break;
+		case SyscallIdThreadExit:
+			status = HandleSyscallIdThreadExit(pSyscallParameters);
+			break;
+		case SyscallIdFileWrite:
+			status = HandleSyscallIdFileWrite(pSyscallParameters);
+			break;
+		case SyscallIdDisableSyscalls:
+			status = HandleSyscallIdDisableSyscalls(pSyscallParameters);
+			break;
+		case SyscallIdMemset:
+			status = HandleSyscallIdMemset(pSyscallParameters);
+			break;
+		default:
+			break;
+		}
+
+    }
+    __finally
+    {
+        LOG_TRACE_USERMODE("Will set UM RAX to 0x%x\n", status);
+
+        UsermodeProcessorState->RegisterValues[RegisterRax] = status;
+
+        CpuIntrSetState(INTR_OFF);
+    }
+}
+
+void
+SyscallPreinitSystem(
+    void
+    )
+{
+
+}
+
+STATUS
+SyscallInitSystem(
+    void
+    )
+{
+    return STATUS_SUCCESS;
+}
+
+STATUS
+SyscallUninitSystem(
+    void
+    )
+{
+    return STATUS_SUCCESS;
+}
+
+STATUS
+HandleSyscallIdDisableSyscalls(
+	PQWORD	pSyscallParameters
+)
+{
+	ASSERT(pSyscallParameters != NULL);
+	SyscallsEnabled = (BOOLEAN) pSyscallParameters[0];
+	return STATUS_SUCCESS;
+}
+
+STATUS
+HandleSyscallIdMemset(
+	PQWORD pSyscallParameters
+)
+{
+	ASSERT(pSyscallParameters != NULL);
+
+	DWORD			bytesToWrite = (DWORD)pSyscallParameters[0];
+	BYTE			valueToWrite = (BYTE)pSyscallParameters[1];
+	PBYTE			address = (PBYTE)pSyscallParameters[2];
+
+	STATUS status = MmuIsBufferValid(address, bytesToWrite, PAGE_RIGHTS_WRITE, GetCurrentProcess());
+	if (SUCCEEDED(status))
+	{
+		LOG_UM(4, "Buffer is valid, writing...");
+		memset(address, valueToWrite, bytesToWrite);
+	}
+	else {
+		LOG_UM(4, "Buffer is not valid!");
+	}
+
+	return status;
+}
+
+
+STATUS
+HandleSyscallIdIdentifyVersion(
+	PQWORD pSyscallParameters
+)
+{
+	SYSCALL_IF_VERSION		version = (SYSCALL_IF_VERSION)pSyscallParameters[0];
+	if (version == SYSCALL_IF_VERSION_KM)
+	{
+		return STATUS_SUCCESS;
+	}
+	else
+	{
+		return STATUS_UNSUCCESSFUL;
+	}
+}
+
+STATUS
+HandleSyscallIdThreadExit(
+	PQWORD pSyscallParameters
+)
+{
+	STATUS					exitStatus = (STATUS)pSyscallParameters[0];
+
+	ThreadExit(exitStatus);
+	return STATUS_SUCCESS;
+}
+
+STATUS
+HandleSyscallIdProcessCreate(
+	PQWORD pSyscallParameters
+)
+{
+	char*                   processPath = (char*)pSyscallParameters[0];
+	DWORD                   pathLength = (DWORD)pSyscallParameters[1];
+	char*                   arguments = (char*)pSyscallParameters[2];
+	DWORD                   argLength = (DWORD)pSyscallParameters[3];
+	UM_HANDLE*              processHandle = (UM_HANDLE*)pSyscallParameters[4];
+
+	if ((strlen(processPath) + 1) != pathLength || (strlen(arguments) + 1) != argLength)
+	{
+		LOG_UM(5, "Path length is incorrect");
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	const char* systemPath = IomuGetSystemPartitionPath();
+	char absolutePath[MAX_PATH];
+	if (strcmp(&processPath[0], "C") == 0 && strcmp(&processPath[1], "\\") == 0)
+	{
+		snprintf(absolutePath, MAX_PATH, "%sAPPLIC~1\\%s", systemPath, processPath);
+	}
+	else
+	{
+		strcpy(absolutePath, processPath);
+	}
+
+
+	PPROCESS process = NULL;
+	STATUS createStatus = ProcessCreate(absolutePath, arguments, &process);
+	if (!SUCCEEDED(createStatus))
+	{
+		LOG_UM(5, "Process create function failed :(");
+		return createStatus;
+	}
+	if (process == NULL)
+	{
+		LOG_UM(5, "Process is null :(");
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	*processHandle = process->Id;
+	PPROCESS parrentProcess = GetCurrentProcess();
+	if (parrentProcess != NULL) {
+		INTR_STATE oldState;
+		LockAcquire(&parrentProcess->ChildrenListLock, &oldState);
+		InsertTailList(&parrentProcess->MyChildrenList, &process->ChildrenListEntry);
+		LockRelease(&parrentProcess->ChildrenListLock, oldState);
+	}
+
+	return STATUS_SUCCESS;
+}
+
+STATUS
+HandleSyscallIdProcessExit(
+	void
+)
+{
+	PPROCESS currentProcess = GetCurrentProcess();
+	PPROCESS systemProcess = ProcessRetrieveSystemProcess();
+
+	INTR_STATE oldState;
+	LockAcquire(&currentProcess->ChildrenListLock, &oldState);
+	for (PLIST_ENTRY pEntry = currentProcess->MyChildrenList.Flink;
+		pEntry != &currentProcess->MyChildrenList;
+		pEntry = pEntry->Flink)
+	{
+		PPROCESS pProcess = CONTAINING_RECORD(pEntry, PROCESS, ChildrenListEntry);
+		RemoveEntryList(pEntry);
+		InsertTailList(&systemProcess->MyChildrenList, &pProcess->ChildrenListEntry);
+	}
+	LockRelease(&currentProcess->ChildrenListLock, oldState);
+
+	ProcessTerminate(currentProcess);
+	return STATUS_SUCCESS;
+}
+
+STATUS
+HandleSyscallIdFileWrite(
+	PQWORD pSyscallParameters
+)
+{
+	UM_HANDLE				fileHandle = (UM_HANDLE)pSyscallParameters[0];
+	PVOID					buffer = (PVOID)pSyscallParameters[1];
+	QWORD					bytesToWrite = (QWORD)pSyscallParameters[2];
+	QWORD*					bytesWritten = (QWORD*)pSyscallParameters[3];
+
+	if (UM_FILE_HANDLE_STDOUT == fileHandle)
+	{
+		LOG("[%s]:[%s]\n", ProcessGetName(NULL), buffer);
+		*bytesWritten = bytesToWrite;
+		return STATUS_SUCCESS;
+	}
+	return STATUS_UNSUCCESSFUL;
+}
+
+void
+SyscallCpuInit(
+    void
+    )
+{
+    IA32_STAR_MSR_DATA starMsr;
+    WORD kmCsSelector;
+    WORD umCsSelector;
+
+    memzero(&starMsr, sizeof(IA32_STAR_MSR_DATA));
+
+    kmCsSelector = GdtMuGetCS64Supervisor();
+    ASSERT(kmCsSelector + 0x8 == GdtMuGetDS64Supervisor());
+
+    umCsSelector = GdtMuGetCS32Usermode();
+    /// DS64 is the same as DS32
+    ASSERT(umCsSelector + 0x8 == GdtMuGetDS32Usermode());
+    ASSERT(umCsSelector + 0x10 == GdtMuGetCS64Usermode());
+
+    // Syscall RIP <- IA32_LSTAR
+    __writemsr(IA32_LSTAR, (QWORD) SyscallEntry);
+
+    LOG_TRACE_USERMODE("Successfully set LSTAR to 0x%X\n", (QWORD) SyscallEntry);
+
+    // Syscall RFLAGS <- RFLAGS & ~(IA32_FMASK)
+    __writemsr(IA32_FMASK, RFLAGS_INTERRUPT_FLAG_BIT);
+
+    LOG_TRACE_USERMODE("Successfully set FMASK to 0x%X\n", RFLAGS_INTERRUPT_FLAG_BIT);
+
+    // Syscall CS.Sel <- IA32_STAR[47:32] & 0xFFFC
+    // Syscall DS.Sel <- (IA32_STAR[47:32] + 0x8) & 0xFFFC
+    starMsr.SyscallCsDs = kmCsSelector;
+
+    // Sysret CS.Sel <- (IA32_STAR[63:48] + 0x10) & 0xFFFC
+    // Sysret DS.Sel <- (IA32_STAR[63:48] + 0x8) & 0xFFFC
+    starMsr.SysretCsDs = umCsSelector;
+
+    __writemsr(IA32_STAR, starMsr.Raw);
+
+    LOG_TRACE_USERMODE("Successfully set STAR to 0x%X\n", starMsr.Raw);
+}
+

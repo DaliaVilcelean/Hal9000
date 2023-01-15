@@ -38,6 +38,7 @@ _ThreadValidatePriority(
     IN          THREAD_PRIORITY     ExpectedPriority
     )
 {
+
     if (ThreadGetPriority(NULL) != ExpectedPriority)
     {
         LOG_ERROR("Thread should have priority %u, actual priority is %u\n",
@@ -176,7 +177,7 @@ STATUS
             // Checks to see if its possible to lower the current thread's priority even if a higher priority thread
             // donated its priority: it must NOT be possible.
             ThreadSetPriority(ThreadPriorityLowest);
-
+            
             if (!_ThreadValidatePriority(ThreadPriorityMaximum))
             {
                 LOG_ERROR("Main thread should not be able to lower its priority to %u while it received a donation!\n",

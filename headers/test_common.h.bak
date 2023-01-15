@@ -1,0 +1,16 @@
+#pragma once
+
+#include "HAL9000.h"
+#include "print.h"
+
+#define TEST_MAX_NO_OF_HEAP_ALLOCATIONS     50
+
+void
+TestRunAllFunctional(
+    void
+    );
+
+void
+TestRunAllPerformance(
+    void
+    );

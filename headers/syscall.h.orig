@@ -1,0 +1,56 @@
+#pragma once
+
+void
+SyscallPreinitSystem(
+    void
+    );
+
+STATUS
+SyscallInitSystem(
+    void
+    );
+
+STATUS
+SyscallUninitSystem(
+    void
+    );
+
+void
+SyscallCpuInit(
+    void
+    );
+
+STATUS
+HandleSyscallIdIdentifyVersion(
+	PQWORD pSyscallParameters
+);
+
+STATUS
+HandleSyscallIdThreadExit(
+	PQWORD pSyscallParameters
+);
+
+STATUS
+HandleSyscallIdProcessExit(
+	void
+);
+
+STATUS
+HandleSyscallIdFileWrite(
+	PQWORD pSyscallParameters
+);
+
+STATUS
+HandleSyscallIdMemset(
+	PQWORD pSyscallParameters
+);
+
+STATUS
+HandleSyscallIdProcessCreate(
+	PQWORD pSyscallParameters
+);
+
+STATUS
+HandleSyscallIdDisableSyscalls(
+	PQWORD	pSyscallParameters
+);

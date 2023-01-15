@@ -1,6 +1,9 @@
 #include "HAL9000.h"
 #include "thread_internal.h"
 #include "mutex.h"
+#include "thread.h"
+#include "log.h"
+
 
 #define MUTEX_MAX_RECURSIVITY_DEPTH         MAX_BYTE
 
@@ -36,10 +39,13 @@ MutexAcquire(
     ASSERT( NULL != Mutex);
     ASSERT( NULL != pCurrentThread );
 
+    THREAD_PRIORITY currentThreadPriority;
+    THREAD_PRIORITY holderThreadPriority;
     if (pCurrentThread == Mutex->Holder)
     {
         ASSERT( Mutex->CurrentRecursivityDepth < Mutex->MaxRecursivityDepth );
 
+        pCurrentThread->WaitedMutex = NULL;
         Mutex->CurrentRecursivityDepth++;
         return;
     }
@@ -55,15 +61,27 @@ MutexAcquire(
 
     while (Mutex->Holder != pCurrentThread)
     {
-        InsertTailList(&Mutex->WaitingList, &pCurrentThread->ReadyList);
+        currentThreadPriority = ThreadGetPriority(pCurrentThread);
+        holderThreadPriority = ThreadGetPriority(Mutex->Holder);
+      
+        if (currentThreadPriority > holderThreadPriority) {
+            ThreadDonatePriority(pCurrentThread, Mutex->Holder);
+        }
+
+        InsertOrderedList(&Mutex->WaitingList, &pCurrentThread->ReadyList, ThreadComparePriorityReadyList, NULL);
+
+        pCurrentThread->WaitedMutex = Mutex;
         ThreadTakeBlockLock();
+
         LockRelease(&Mutex->MutexLock, dummyState);
+
         ThreadBlock();
         LockAcquire(&Mutex->MutexLock, &dummyState );
     }
 
     _Analysis_assume_lock_acquired_(*Mutex);
-
+    
+    InsertTailList(&pCurrentThread->AcquiredMutexesList, &Mutex->AcquiredMutexListElem);
     LockRelease(&Mutex->MutexLock, dummyState);
 
     CpuIntrSetState(oldState);
@@ -92,6 +110,9 @@ MutexRelease(
 
     LockAcquire(&Mutex->MutexLock, &oldState);
 
+    RemoveEntryList(&Mutex->AcquiredMutexListElem);
+    ThreadRecomputePriority(GetCurrentThread());
+
     pEntry = RemoveHeadList(&Mutex->WaitingList);
     if (pEntry != &Mutex->WaitingList)
     {
@@ -108,6 +129,6 @@ MutexRelease(
     }
 
     _Analysis_assume_lock_released_(*Mutex);
-
-    LockRelease(&Mutex->MutexLock, oldState);
+    
+    LockRelease(&Mutex->MutexLock, oldState);    
 }

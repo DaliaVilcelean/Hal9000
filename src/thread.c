@@ -33,12 +33,18 @@ typedef struct _THREAD_SYSTEM_DATA
     LIST_ENTRY          AllThreadsList;
 
     LOCK                ReadyThreadsLock;
-    int                 ThreadCount;
+
     _Guarded_by_(ReadyThreadsLock)
     LIST_ENTRY          ReadyThreadsList;
 } THREAD_SYSTEM_DATA, *PTHREAD_SYSTEM_DATA;
 
+
 static THREAD_SYSTEM_DATA m_threadSystemData;
+
+typedef struct _PRIORITY_DONATION_CTX
+{
+    THREAD_PRIORITY maximumPriority;
+} PRIORITY_DONATION_CTX, *PPRIORITY_DONATION_CTX;
 
 __forceinline
 static
@@ -78,6 +84,7 @@ _ThreadSetupMainThreadUserStack(
     OUT     PVOID*              ResultingStack,
     IN      PPROCESS            Process
     );
+
 
 REQUIRES_EXCL_LOCK(m_threadSystemData.ReadyThreadsLock)
 RELEASES_EXCL_AND_NON_REENTRANT_LOCK(m_threadSystemData.ReadyThreadsLock)
@@ -138,16 +145,11 @@ ThreadSystemPreinit(
     )
 {
     memzero(&m_threadSystemData, sizeof(THREAD_SYSTEM_DATA));
-    m_threadSystemData.ThreadCount = 0;
 
     InitializeListHead(&m_threadSystemData.AllThreadsList);
-    m_threadSystemData.ThreadCount += 1;
-
     LockInit(&m_threadSystemData.AllThreadsLock);
 
-    m_threadSystemData.ThreadCount = 0;
     InitializeListHead(&m_threadSystemData.ReadyThreadsList);
-
     LockInit(&m_threadSystemData.ReadyThreadsLock);
 }
 
@@ -273,13 +275,13 @@ ThreadCreate(
     OUT_PTR     PTHREAD*            Thread
     )
 {
-    STATUS s =  ThreadCreateEx(Name,
+
+    return ThreadCreateEx(Name,
                           Priority,
                           Function,
                           Context,
                           Thread,
                           ProcessRetrieveSystemProcess());
-    return s;
 }
 
 STATUS
@@ -331,7 +333,6 @@ ThreadCreateEx(
     ASSERT(NULL != pCpu);
 
     status = _ThreadInit(Name, Priority, &pThread, TRUE);
-    LOG("Thread with name %s and pid %u was created\n", pThread->Name, pThread->Id);
     if (!SUCCEEDED(status))
     {
         LOG_FUNC_ERROR("_ThreadInit", status);
@@ -420,7 +421,7 @@ ThreadCreateEx(
     }
 
     *Thread = pThread;
-
+    //increment descendents and keep a pointer to current thread
     return status;
 }
 
@@ -612,7 +613,6 @@ ThreadCloseHandle(
     INOUT   PTHREAD             Thread
     )
 {
-    LOG("Thread with name %s and pid %u was terminated\n", Thread->Name, Thread->Id);
     ASSERT( NULL != Thread);
 
     _ThreadDereference(Thread);
@@ -667,7 +667,10 @@ ThreadSetPriority(
 {
     ASSERT(ThreadPriorityLowest <= NewPriority && NewPriority <= ThreadPriorityMaximum);
 
-    GetCurrentThread()->Priority = NewPriority;
+    PTHREAD pCurrentThread = GetCurrentThread();
+    pCurrentThread->RealPriority = NewPriority;
+    if(NewPriority > pCurrentThread->Priority)
+      ThreadRecomputePriority(pCurrentThread);
 }
 
 STATUS
@@ -801,6 +804,10 @@ _ThreadInit(
         pThread->State = ThreadStateBlocked;
         pThread->Priority = Priority;
 
+        pThread->RealPriority = Priority;
+        pThread->WaitedMutex = NULL;
+        InitializeListHead(&pThread->AcquiredMutexesList);
+        
         LockInit(&pThread->BlockLock);
 
         LockAcquire(&m_threadSystemData.AllThreadsLock, &oldIntrState);
@@ -820,8 +827,7 @@ _ThreadInit(
 
         *Thread = pThread;
 
-        LOG_FUNC_END;
-    }
+        LOG_FUNC_END;    }
 
     return status;
 }
@@ -1245,4 +1251,102 @@ _ThreadKernelFunction(
 
     ThreadExit(exitStatus);
     NOT_REACHED;
+}
+
+STATUS
+(__cdecl RecomputePriorityForEachThreadInWaitingList) (
+    IN      PLIST_ENTRY     ListEntry,
+    IN_OPT  PVOID           FunctionContext
+    )
+{
+    ASSERT(FunctionContext != NULL);
+    PPRIORITY_DONATION_CTX priorityDonationContext = (PPRIORITY_DONATION_CTX)FunctionContext;
+    PTHREAD pThread = CONTAINING_RECORD(ListEntry, THREAD, ReadyList);
+
+    if (priorityDonationContext->maximumPriority < ThreadGetPriority(pThread)) {
+        priorityDonationContext->maximumPriority = ThreadGetPriority(pThread);
+    }
+
+    return STATUS_SUCCESS;
+}
+
+STATUS
+(__cdecl RecomputePriorityForEachMutex) (
+    IN      PLIST_ENTRY     ListEntry,
+    IN_OPT  PVOID           FunctionContext
+    ) 
+{
+    PMUTEX  waitedMutex = CONTAINING_RECORD(ListEntry, MUTEX, AcquiredMutexListElem);
+    ForEachElementExecute(&waitedMutex->WaitingList, RecomputePriorityForEachThreadInWaitingList, FunctionContext, FALSE);
+    return STATUS_SUCCESS;
+}
+
+void
+ThreadRecomputePriority(
+    INOUT   PTHREAD     Thread
+    )
+{   
+    PRIORITY_DONATION_CTX priorityDonationContext = { 0 };
+    priorityDonationContext.maximumPriority = Thread->RealPriority;
+    ForEachElementExecute(&Thread->AcquiredMutexesList, RecomputePriorityForEachMutex, &priorityDonationContext, FALSE);
+ 
+    Thread->Priority = priorityDonationContext.maximumPriority;
+}
+
+
+void
+ThreadDonatePriority(
+    INOUT PTHREAD  currentThread,
+    INOUT PTHREAD MutexHolder
+)
+{
+    ASSERT(currentThread != NULL);
+    ASSERT(MutexHolder != NULL);
+
+    do {
+        if (ThreadGetPriority(currentThread) > ThreadGetPriority(MutexHolder))
+        {
+            MutexHolder->Priority = currentThread->Priority;
+        }
+        else
+        {
+            break;
+        }
+
+        if (MutexHolder->WaitedMutex)
+        {
+            currentThread = MutexHolder;
+            MutexHolder = MutexHolder->WaitedMutex->Holder;
+        }
+        else 
+        {
+            MutexHolder = NULL;
+        }
+    } while (MutexHolder != NULL);
+}
+
+
+INT64
+(__cdecl ThreadComparePriorityReadyList)
+(IN      PLIST_ENTRY     FirstElem,
+    IN      PLIST_ENTRY     SecondElem,
+    IN_OPT  PVOID           Context) {
+
+    UNREFERENCED_PARAMETER(Context);
+
+    PTHREAD t1 = CONTAINING_RECORD(FirstElem, THREAD, ReadyList);
+    PTHREAD t2 = CONTAINING_RECORD(SecondElem, THREAD, ReadyList);
+
+    THREAD_PRIORITY p1 = ThreadGetPriority(t1);
+    THREAD_PRIORITY p2 = ThreadGetPriority(t2);
+
+    if (p1 < p2) {
+        return 1;
+    }
+    else if (p1 > p2) {
+        return -1;
+    }
+    else {
+        return 0;
+    }
 }

@@ -1,0 +1,126 @@
+#pragma once
+
+#include "register.h"
+#include "tss.h"
+#include "cpu.h"
+#include "list.h"
+#include "synch.h"
+
+#define STACK_DEFAULT_SIZE          (3*PAGE_SIZE)
+#define STACK_GUARD_SIZE            (2*PAGE_SIZE)
+
+typedef struct _THREADING_DATA
+{
+    DWORD               RunningThreadTicks;
+    struct _THREAD*     IdleThread;
+    struct _THREAD*     CurrentThread;
+
+    BOOLEAN             YieldOnInterruptReturn;
+
+    QWORD               IdleTicks;
+    QWORD               KernelTicks;
+} THREADING_DATA, *PTHREADING_DATA;
+
+typedef struct _PCPU
+{
+    PVOID                       StackTop;
+    DWORD                       StackSize;
+
+    APIC_ID                     ApicId;
+    APIC_ID                     LogicalApicId;
+    BOOLEAN                     BspProcessor;
+
+    // TSS base address
+    TSS                         Tss;
+    PVOID                       TssStacks[NO_OF_IST];
+    BYTE                        NumberOfTssStacks;
+    WORD                        TrSelector;
+
+    LIST_ENTRY                  ListEntry;
+
+    BOOLEAN                     ApicInitialized;
+
+    THREADING_DATA              ThreadData;
+
+    // IPC data
+    LIST_ENTRY                  EventList;
+    LOCK                        EventListLock;
+    DWORD                       NoOfEventsInList;
+
+    BOOLEAN                     VmmMemoryAccess;
+    QWORD                       PageFaults;
+
+    QWORD                       InterruptsTriggered[NO_OF_TOTAL_INTERRUPTS];
+} PCPU, *PPCPU;
+
+#define GetCurrentPcpu()    ((PCPU*)__readmsr(IA32_GS_BASE_MSR))
+#define SetCurrentPcpu(pc)  (__writemsr(IA32_GS_BASE_MSR,(pc)))
+
+void
+CpuMuPreinit(
+    void
+    );
+
+void
+CpuMuValidateConfiguration(
+    void
+    );
+
+STATUS
+CpuMuSetMonitorFilterSize(
+    IN          WORD        FilterSize
+    );
+
+STATUS
+CpuMuAllocAndInitCpu(
+    OUT_PTR     PPCPU*      PhysicalCpu,
+    IN _Strict_type_match_
+                APIC_ID     ApicId,
+    IN          DWORD       StackSize,
+    IN          BYTE        NoOfTssStacks
+    );
+
+STATUS
+CpuMuAllocCpu(
+    OUT_PTR     PPCPU*      PhysicalCpu,
+    IN _Strict_type_match_
+                APIC_ID     ApicId,
+    IN          DWORD       StackSize,
+    IN          BYTE        NumberOfTssStacks
+    );
+
+STATUS
+CpuMuInitCpu(
+    IN          PPCPU       PhysicalCpu,
+    IN          BOOLEAN     ChangeStack
+    );
+
+PTR_SUCCESS
+PVOID
+CpuMuAllocCpuStack(
+    IN          DWORD       StackSize,
+    IN          BOOLEAN     ProtectStack,
+    IN          BOOLEAN     LazyMap
+    );
+
+void
+CpuMuChangeStack(
+    IN          PVOID       NewStack
+    );
+
+void
+CpuMuFreeStack(
+    IN          PVOID       Stack
+    );
+
+#define CURRENT_CPU_MASK        0x8000'0000'0000'0000ULL
+
+__forceinline
+extern
+PVOID
+CpuGetCurrent(void)
+{
+    // warning C4306: 'type cast': conversion from 'BYTE' to 'PVOID' of greater size
+#pragma warning(suppress:4306)
+    return (PVOID) ( CURRENT_CPU_MASK | CpuGetApicId());
+}

@@ -1,0 +1,20 @@
+#pragma once
+
+#include "io.h"
+
+void
+OsInfoPreinit(
+    void
+    );
+
+STATUS
+OsInfoInit(
+    void
+    );
+
+char*
+OsInfoGetName(
+    void
+    );
+
+FUNC_InterruptFunction         OsInfoTimeUpdateIsr;

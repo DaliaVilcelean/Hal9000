@@ -1,0 +1,703 @@
+#include "HAL9000.h"
+#include "syscall.h"
+#include "gdtmu.h"
+#include "syscall_struct.h"
+#include "syscall_defs.h"
+#include "syscall_func.h"
+#include "syscall_no.h"
+#include "mmu.h"
+#include "process.h"
+
+/// to remove
+#include "dmp_cpu.h"
+#include "dmp_memory.h"
+#include "dmp_syscall.h"
+
+#define SYSCALL_MIN_NO_OF_PARAMS_ON_STACK           0x3
+
+extern void SyscallEntry();
+
+static SYSCALL_FUNC_DESCRIPTION m_sysFuncs[SyscallIdReserved] =
+{
+    // SyscallIdIdentifyVersion
+    {SyscallValidateInterface, 1,
+        {
+            {SYS_PARAM_TYPE_SCALAR}     // IN  SYSCALL_IF_VERSION          InterfaceVersion
+        }
+    },
+
+    // SyscallIdThreadExit
+    {SyscallThreadExit, 1,
+        {
+            {SYS_PARAM_TYPE_SCALAR}     // IN  STATUS                      ExitStatus
+        }
+    },
+
+    // SyscallIdThreadCreate
+    {SyscallThreadCreate, 3,
+        {
+            {SYS_PARAM_TYPE_POINTER, 0, TRUE, FALSE, FALSE, TRUE, sizeof(PVOID)},    //  IN      PFUNC_ThreadStart       StartFunction,
+            {SYS_PARAM_TYPE_POINTER, 0, TRUE, FALSE, TRUE, TRUE, 0},                 //  IN_OPT  PVOID                   Context,
+            {SYS_PARAM_TYPE_POINTER, 0, FALSE, TRUE, FALSE, TRUE, sizeof(UM_HANDLE)} //  OUT     UM_HANDLE*              ThreadHandle
+        }
+    },
+
+    // SyscallIdThreadGetTid
+    {SyscallThreadGetTid, 2,
+        {
+            {SYS_PARAM_TYPE_HANDLE, 0, 0, 0, TRUE, 0, HANDLE_TYPE_THREAD},           // IN_OPT  UM_HANDLE               ThreadHandle,
+            {SYS_PARAM_TYPE_POINTER, 0, FALSE, TRUE, FALSE, TRUE, sizeof(TID)},      // OUT     TID*                    ThreadId
+        }
+    },
+
+    // SyscallIdThreadCloseHandle
+    {SyscallThreadCloseHandle, 1,
+        {
+            {SYS_PARAM_TYPE_HANDLE, 0, 0, 0, FALSE, 0, HANDLE_TYPE_THREAD},   // IN       UM_HANDLE              ThreadHandle,
+        }
+    },
+
+    // SyscallIdProcessExit
+    {SyscallProcessExit, 1,
+        {
+            {SYS_PARAM_TYPE_SCALAR} // IN  STATUS                      ExitStatus
+        }
+    },
+
+    // SyscallIdProcessGetPid
+    {SyscallProcessGetPid, 2,
+        {
+            {SYS_PARAM_TYPE_HANDLE, 0, 0, 0, TRUE, 0, HANDLE_TYPE_PROCESS},   // IN_OPT  UM_HANDLE               ProcessHandle,
+            {SYS_PARAM_TYPE_POINTER, 0, FALSE, TRUE, FALSE, TRUE, sizeof(PID)},      // OUT     PID*                    ProcessId
+        }
+    },
+
+    // SyscallIdProcessCloseHandle
+    {SyscallProcessCloseHandle, 1,
+        {
+            {SYS_PARAM_TYPE_HANDLE, 0, 0, 0, FALSE, 0, HANDLE_TYPE_PROCESS},   // IN       UM_HANDLE             ProcessHandle,
+        }
+    },
+
+    // SyscallIdVirtualAlloc
+    {SyscallVirtualAlloc, 5,
+        {
+            {SYS_PARAM_TYPE_POINTER, 0, 0, 0, TRUE, TRUE, 0},        // IN_OPT      PVOID                   BaseAddress,
+            {SYS_PARAM_TYPE_SCALAR},                                // IN          QWORD                   Size,
+            {SYS_PARAM_TYPE_SCALAR},                                // IN          VMM_ALLOC_TYPE          AllocType,
+            {SYS_PARAM_TYPE_SCALAR},                                // IN          PAGE_RIGHTS             PageRights,
+            {SYS_PARAM_TYPE_HANDLE, 0, 0, 0, TRUE, 0, HANDLE_TYPE_FILE},  // IN_OPT      UM_HANDLE               FileHandle,
+        }
+    },
+
+    // SyscallIdVirtualFree
+    {SyscallVirtualFree, 3,
+        {
+            {SYS_PARAM_TYPE_POINTER, 0, 0, 0, FALSE, TRUE, 0},            // IN          PVOID                   Address,
+            {SYS_PARAM_TYPE_SCALAR},                                // IN          QWORD                   Size,
+            {SYS_PARAM_TYPE_SCALAR},                                // IN          VMM_FREE_TYPE           AllocType,
+        }
+    },
+
+    // SyscallIdFileCreate
+    {SyscallFileCreate, 5,
+        {
+            {SYS_PARAM_TYPE_POINTER, 0, TRUE, FALSE, FALSE, FALSE, 1},                 // IN_READS_Z(PathLength) char*        Path,
+            {SYS_PARAM_TYPE_SCALAR},                                      // IN          DWORD                   PathLength,
+            {SYS_PARAM_TYPE_SCALAR},                                      // IN          BOOLEAN                 Directory,
+            {SYS_PARAM_TYPE_SCALAR},                                      // IN          BOOLEAN                 Create,
+            {SYS_PARAM_TYPE_POINTER, 0, FALSE, TRUE, FALSE, FALSE, sizeof(UM_HANDLE)}, // OUT         UM_HANDLE*              FileHandle,
+        }
+    },
+
+    // SyscallIdFileClose
+    {SyscallFileClose, 1,
+        {
+            {SYS_PARAM_TYPE_HANDLE, 0, 0, 0, FALSE, 0, HANDLE_TYPE_FILE}, // IN          UM_HANDLE               FileHandle,
+        }
+    },
+
+    // SyscallIdFileRead
+    {SyscallFileRead, 4,
+        {
+            {SYS_PARAM_TYPE_HANDLE, 0, 0, 0, FALSE, 0, HANDLE_TYPE_FILE}, // IN  UM_HANDLE                        FileHandle
+            {SYS_PARAM_TYPE_POINTER, 0, FALSE, TRUE, FALSE, FALSE, 2},           // OUT_WRITES_BYTES(BufferSize) PVOID   Buffer,
+            {SYS_PARAM_TYPE_SCALAR},                                // IN  QWORD                            BufferSize
+            {SYS_PARAM_TYPE_POINTER, 0, FALSE, TRUE, FALSE, TRUE, sizeof(QWORD)} // OUT QWORD*                           BytesRead
+        }
+    },
+
+    // SyscallIdFileWrite
+    {SyscallFileWrite, 4,
+        {
+            {SYS_PARAM_TYPE_HANDLE, 0, 0, 0, FALSE, 0, HANDLE_TYPE_FILE}, // IN  UM_HANDLE                        FileHandle
+            {SYS_PARAM_TYPE_POINTER, 0, TRUE, FALSE, FALSE, FALSE, 2},           // IN_READS_BYTES(BufferSize) PVOID     Buffer,
+            {SYS_PARAM_TYPE_SCALAR},                                // IN  QWORD                            BufferSize
+            {SYS_PARAM_TYPE_POINTER, 0, FALSE, TRUE, FALSE, TRUE, sizeof(QWORD)} // OUT QWORD*                           BytesWritten
+        }
+    }
+};
+
+static
+QWORD
+__forceinline
+_SyscallPointerGetSize(
+    IN      PSYSCALL_FUNC_DESCRIPTION   FunctionDescription,
+    IN      DWORD                       PointerIndex,
+    IN      PQWORD                      Parameters
+    )
+{
+    PSYSCALL_PARAMETER pCurrentParameter;
+    QWORD bufferSize;
+
+    ASSERT(FunctionDescription != NULL);
+    ASSERT(Parameters != NULL);
+
+    ASSERT(PointerIndex < FunctionDescription->NumberOfParameters);
+
+    pCurrentParameter = &FunctionDescription->Parameters[PointerIndex];
+
+    if (pCurrentParameter->FixedSize)
+    {
+        bufferSize = pCurrentParameter->PointerSize;
+    }
+    else
+    {
+        // pointer size is described by a parameter
+        BYTE paramIdx = pCurrentParameter->SizeIndexParameter;
+
+        ASSERT(paramIdx < FunctionDescription->NumberOfParameters);
+        ASSERT(FunctionDescription->Parameters[paramIdx].ParamType == SYS_PARAM_TYPE_SCALAR);
+
+        bufferSize = Parameters[paramIdx];
+    }
+
+    return bufferSize;
+}
+
+static
+STATUS
+_SyscallValidateUserState(
+    IN      PPROCESSOR_STATE            UsermodeProcessorState
+    );
+
+static
+STATUS
+_SyscallValidateParameters(
+    IN      PSYSCALL_FUNC_DESCRIPTION   FunctionDescription,
+    IN      PQWORD                      Parameters
+    );
+
+static
+STATUS
+_SyscallMapPointers(
+    IN      PSYSCALL_FUNC_DESCRIPTION   FunctionDescription,
+    IN      PQWORD                      OldParameters,
+    IN      PQWORD                      NewParameters
+    );
+
+static
+void
+_SyscallUnmapPointers(
+    IN      PSYSCALL_FUNC_DESCRIPTION   FunctionDescription,
+    IN      PQWORD                      MappedParameters
+    );
+
+static
+STATUS
+_SyscallDispatchFunction(
+    IN      PFUNC_GenericSyscall        SyscallFunction,
+    IN_READS(NoOfParameters)
+            PQWORD                      Parameters,
+    IN      BYTE                        NoOfParameters
+    );
+
+void
+SyscallHandler(
+    INOUT   PPROCESSOR_STATE    UsermodeProcessorState
+    )
+{
+    SYSCALL_ID sysCallId;
+    PQWORD pSyscallParameters;
+    PSYSCALL_FUNC_DESCRIPTION pFuncDescription;
+    STATUS status;
+    QWORD translatedParameters[SYSCALL_MAX_NO_OF_PARAMS];
+
+<<<<<<< local
+=======
+    // It is NOT ok to setup the FMASK so that interrupts will be enabled when the system call occurs
+    // The issue is that we'll have a user-mode stack and we wouldn't want to receive an interrupt on
+    // that stack. This is why we only enable interrupts here.
+>>>>>>> other
+    ASSERT(CpuIntrGetState() == INTR_OFF);
+    CpuIntrSetState(INTR_ON);
+
+    LOG_TRACE_USERMODE("The syscall handler has been called!\n");
+
+    status = STATUS_SUCCESS;
+    pSyscallParameters = NULL;
+    pFuncDescription = NULL;
+    memzero(translatedParameters, sizeof(QWORD) * SYSCALL_MAX_NO_OF_PARAMS);
+
+    __try
+    {
+        if (LogIsComponentTraced(LogComponentUserMode))
+        {
+            DumpProcessorState(UsermodeProcessorState);
+        }
+
+        status = _SyscallValidateUserState(UsermodeProcessorState);
+        if (!SUCCEEDED(status))
+        {
+            LOG_FUNC_ERROR("_SyscallValidateUserState", status);
+            __leave;
+        }
+
+        sysCallId = UsermodeProcessorState->RegisterValues[RegisterR8];
+        pSyscallParameters = (PQWORD)UsermodeProcessorState->RegisterValues[RegisterRbp] + 1;
+        pFuncDescription = &m_sysFuncs[sysCallId];
+
+        if (LogIsComponentTraced(LogComponentUserMode))
+        {
+            DumpMemory(pSyscallParameters,
+                       (QWORD)pSyscallParameters,
+                       pFuncDescription->NumberOfParameters * sizeof(QWORD),
+                       TRUE,
+                       TRUE);
+        }
+
+        LOG_TRACE_USERMODE("Will call function at 0x%X\n", pFuncDescription->Function);
+
+        status = _SyscallValidateParameters(pFuncDescription,
+                                            pSyscallParameters);
+        if (!SUCCEEDED(status))
+        {
+            LOG_FUNC_ERROR("_SyscallValidateParameters", status);
+            __leave;
+        }
+
+        status = _SyscallMapPointers(pFuncDescription,
+                                     pSyscallParameters,
+                                     translatedParameters
+                                     );
+        if (!SUCCEEDED(status))
+        {
+            LOG_FUNC_ERROR("_SyscallMapPointers", status);
+            __leave;
+        }
+
+        // skip over syscall ID parameter
+        status = _SyscallDispatchFunction(pFuncDescription->Function,
+                                          translatedParameters,
+                                          pFuncDescription->NumberOfParameters);
+        if (!SUCCEEDED(status))
+        {
+            LOG_FUNC_ERROR("_SyscallDispatchFunction", status);
+            __leave;
+        }
+    }
+    __finally
+    {
+        // Unmap the KM addresses
+        _SyscallUnmapPointers(pFuncDescription,
+                              translatedParameters);
+
+        LOG_TRACE_USERMODE("Will set UM RAX to 0x%x\n", status);
+
+        UsermodeProcessorState->RegisterValues[RegisterRax] = status;
+
+        CpuIntrSetState(INTR_OFF);
+    }
+}
+
+void
+SyscallPreinitSystem(
+    void
+    )
+{
+
+}
+
+STATUS
+SyscallInitSystem(
+    void
+    )
+{
+    return STATUS_SUCCESS;
+}
+
+STATUS
+SyscallUninitSystem(
+    void
+    )
+{
+    return STATUS_SUCCESS;
+}
+
+void
+SyscallCpuInit(
+    void
+    )
+{
+    IA32_STAR_MSR_DATA starMsr;
+    WORD kmCsSelector;
+    WORD umCsSelector;
+
+    memzero(&starMsr, sizeof(IA32_STAR_MSR_DATA));
+
+    kmCsSelector = GdtMuGetCS64Supervisor();
+    ASSERT(kmCsSelector + 0x8 == GdtMuGetDS64Supervisor());
+
+    umCsSelector = GdtMuGetCS32Usermode();
+    /// DS64 is the same as DS32
+    ASSERT(umCsSelector + 0x8 == GdtMuGetDS32Usermode());
+    ASSERT(umCsSelector + 0x10 == GdtMuGetCS64Usermode());
+
+    // Syscall RIP <- IA32_LSTAR
+    __writemsr(IA32_LSTAR, (QWORD) SyscallEntry);
+
+    LOG_TRACE_USERMODE("Successfully set LSTAR to 0x%X\n", (QWORD) SyscallEntry);
+
+    // Syscall RFLAGS <- RFLAGS & ~(IA32_FMASK)
+    __writemsr(IA32_FMASK, RFLAGS_INTERRUPT_FLAG_BIT);
+
+    LOG_TRACE_USERMODE("Successfully set FMASK to 0x%X\n", RFLAGS_INTERRUPT_FLAG_BIT);
+
+    // Syscall CS.Sel <- IA32_STAR[47:32] & 0xFFFC
+    // Syscall DS.Sel <- (IA32_STAR[47:32] + 0x8) & 0xFFFC
+    starMsr.SyscallCsDs = kmCsSelector;
+
+    // Sysret CS.Sel <- (IA32_STAR[63:48] + 0x10) & 0xFFFC
+    // Sysret DS.Sel <- (IA32_STAR[63:48] + 0x8) & 0xFFFC
+    starMsr.SysretCsDs = umCsSelector;
+
+    __writemsr(IA32_STAR, starMsr.Raw);
+
+    LOG_TRACE_USERMODE("Successfully set STAR to 0x%X\n", starMsr.Raw);
+}
+
+static
+STATUS
+_SyscallValidateUserState(
+    IN      PPROCESSOR_STATE            UsermodeProcessorState
+    )
+{
+    SYSCALL_ID sysCallId;
+    PQWORD pParameters;
+    STATUS status;
+    PPROCESS pCurrentProcess;
+    PSYSCALL_FUNC_DESCRIPTION pFuncDescription;
+
+    ASSERT(UsermodeProcessorState != NULL);
+
+    status = STATUS_SUCCESS;
+    pParameters = NULL;
+    pCurrentProcess = GetCurrentProcess();
+    pFuncDescription = NULL;
+
+    sysCallId = UsermodeProcessorState->RegisterValues[RegisterR8];
+    if (sysCallId >= SyscallIdReserved)
+    {
+        LOG_ERROR("Usermode application called syscall 0x%x. Does not exist!\n",
+                  sysCallId);
+        return STATUS_NOT_IMPLEMENTED;
+    }
+
+    pParameters = (PQWORD)UsermodeProcessorState->RegisterValues[RegisterRbp];
+    status = MmuIsBufferValid(pParameters, SHADOW_STACK_SIZE, PAGE_RIGHTS_READ, pCurrentProcess);
+    if (!SUCCEEDED(status))
+    {
+        LOG_FUNC_ERROR("MmuIsBufferValid", status);
+        return status;
+    }
+
+    ASSERT(pParameters[0] == sysCallId);
+
+    pFuncDescription = &m_sysFuncs[sysCallId];
+    ASSERT(pFuncDescription->NumberOfParameters <= SYSCALL_MAX_NO_OF_PARAMS);
+
+    if (pFuncDescription->NumberOfParameters > SYSCALL_MIN_NO_OF_PARAMS_ON_STACK)
+    {
+        status = MmuIsBufferValid(PtrOffset(pParameters, SHADOW_STACK_SIZE),
+                                  (pFuncDescription->NumberOfParameters - SYSCALL_MIN_NO_OF_PARAMS_ON_STACK) * sizeof(QWORD),
+                                  PAGE_RIGHTS_READ,
+                                  pCurrentProcess);
+        if (!SUCCEEDED(status))
+        {
+            LOG_FUNC_ERROR("MmuIsBufferValid", status);
+            return status;
+        }
+    }
+
+    return STATUS_SUCCESS;
+}
+
+static
+STATUS
+_SyscallValidateParameters(
+    IN      PSYSCALL_FUNC_DESCRIPTION   FunctionDescription,
+    IN      PQWORD                      Parameters
+    )
+{
+    STATUS status;
+
+    ASSERT(FunctionDescription != NULL);
+    ASSERT(Parameters != NULL);
+
+    status = STATUS_SUCCESS;
+
+    for (DWORD i = 0; i < FunctionDescription->NumberOfParameters; ++i)
+    {
+        PSYSCALL_PARAMETER pCurrentParmeter = &FunctionDescription->Parameters[i];
+        PVOID curParamValue = (PVOID) Parameters[i];
+
+        LOG_TRACE_USERMODE("Will validate param 0x%x\n", i);
+        if (LogIsComponentTraced(LogComponentUserMode))
+        {
+            DumpSyscallParameter(&FunctionDescription->Parameters[i]);
+        }
+
+        if (pCurrentParmeter->ParamType == SYS_PARAM_TYPE_SCALAR)
+        {
+            // nothing to see here :)
+            continue;
+        }
+
+        if (pCurrentParmeter->ParamType == SYS_PARAM_TYPE_POINTER || pCurrentParmeter->ParamType == SYS_PARAM_TYPE_HANDLE)
+        {
+            if (curParamValue == NULL)
+            {
+                if (pCurrentParmeter->IsOptional)
+                {
+                    // Optional parameter is NULL => don't bother with it
+                    continue;
+                }
+                else
+                {
+                    LOG_ERROR("Parameter 0x%x is NULL!\n", i);
+                    status = STATUS_INVALID_PARAMETER1 + i;
+                    break;
+                }
+            }
+        }
+
+        if (pCurrentParmeter->ParamType == SYS_PARAM_TYPE_POINTER)
+        {
+            QWORD bufferSize;
+
+            bufferSize = _SyscallPointerGetSize(FunctionDescription,
+                                                i,
+                                                Parameters);
+            LOG_TRACE_USERMODE("Buffer size is 0x%X\n", bufferSize);
+
+            if (bufferSize != 0)
+            {
+                PAGE_RIGHTS rightsRequested;
+
+                rightsRequested = 0;
+                rightsRequested |= (pCurrentParmeter->Input)    ? PAGE_RIGHTS_READ : 0;
+                rightsRequested |= (pCurrentParmeter->Output)   ? PAGE_RIGHTS_WRITE : 0;
+
+                LOG_TRACE_USERMODE("Will check buffer at 0x%X of size 0x%X which requested rights 0x%x\n",
+                                   curParamValue, bufferSize, rightsRequested);
+
+                status = MmuIsBufferValid(curParamValue,
+                                          bufferSize,
+                                          rightsRequested,
+                                          GetCurrentProcess());
+                if (!SUCCEEDED(status))
+                {
+                    LOG_FUNC_ERROR("MmuIsBufferValid", status);
+                    break;
+                }
+            }
+
+            // Successfully validated pointer
+            continue;
+        }
+
+        if (pCurrentParmeter->ParamType == SYS_PARAM_TYPE_HANDLE)
+        {
+            /// TODO: Validate Handle
+
+            continue;
+        }
+    }
+
+    return status;
+}
+
+static
+STATUS
+_SyscallMapPointers(
+    IN      PSYSCALL_FUNC_DESCRIPTION   FunctionDescription,
+    IN      PQWORD                      OldParameters,
+    IN      PQWORD                      NewParameters
+    )
+{
+    STATUS status;
+
+    ASSERT(FunctionDescription != NULL);
+    ASSERT(OldParameters != NULL);
+    ASSERT(NewParameters != NULL);
+
+    status = STATUS_SUCCESS;
+
+    memzero(NewParameters, FunctionDescription->NumberOfParameters * sizeof(QWORD));
+
+    __try
+    {
+        for (DWORD i = 0; i < FunctionDescription->NumberOfParameters; ++i)
+        {
+            PSYSCALL_PARAMETER pCurrentParameter = &FunctionDescription->Parameters[i];
+            QWORD translatedValue;
+
+            translatedValue = OldParameters[i];
+
+            if (pCurrentParameter->ParamType == SYS_PARAM_TYPE_POINTER)
+            {
+                QWORD bufferSize;
+                PAGE_RIGHTS rightsRequired;
+
+                rightsRequired = 0;
+
+                rightsRequired |= pCurrentParameter->Input ? PAGE_RIGHTS_READ : 0;
+                rightsRequired |= pCurrentParameter->Output ? PAGE_RIGHTS_WRITE : 0;
+
+                bufferSize = _SyscallPointerGetSize(FunctionDescription,
+                                                    i,
+                                                    OldParameters);
+                if (bufferSize != 0)
+                {
+                    PVOID pKernelAddress;
+
+                    LOG_TRACE_USERMODE("Will map buffer at 0x%X of size 0x%X\n", OldParameters[i], bufferSize);
+
+                    status = MmuGetSystemVirtualAddressForUserBuffer((PVOID)OldParameters[i],
+                                                                     bufferSize,
+                                                                     rightsRequired,
+                                                                     GetCurrentProcess(),
+                                                                     &pKernelAddress);
+                    if (!SUCCEEDED(status))
+                    {
+                        LOG_FUNC_ERROR("MmuGetSystemVirtualAddressForUserBuffer", status);
+                        __leave;
+                    }
+
+                    translatedValue = (QWORD) pKernelAddress;
+                }
+            }
+
+            NewParameters[i] = translatedValue;
+        }
+    }
+    __finally
+    {
+        if (!SUCCEEDED(status))
+        {
+            _SyscallUnmapPointers(FunctionDescription,
+                                  NewParameters);
+        }
+    }
+
+    return status;
+}
+
+static
+void
+_SyscallUnmapPointers(
+    IN      PSYSCALL_FUNC_DESCRIPTION   FunctionDescription,
+    IN      PQWORD                      MappedParameters
+    )
+{
+    ASSERT(FunctionDescription != NULL);
+    ASSERT(MappedParameters != NULL);
+
+    for (DWORD i = 0; i < FunctionDescription->NumberOfParameters; ++i)
+    {
+        // If the value of the new parameter is different from NULL and the parameter is of type pointer
+        // it's clear that we translated the UM address for KM access
+        if (FunctionDescription->Parameters[i].ParamType == SYS_PARAM_TYPE_POINTER
+            && MappedParameters[i] != 0)
+        {
+            MmuFreeSystemVirtualAddressForUserBuffer((PVOID)MappedParameters[i]);
+            MappedParameters[i] = 0;
+        }
+    }
+}
+
+static
+STATUS
+_SyscallDispatchFunction(
+    IN      PFUNC_GenericSyscall        SyscallFunction,
+    IN_READS(NoOfParameters)
+            PQWORD                      Parameters,
+    IN      BYTE                        NoOfParameters
+    )
+{
+    STATUS syscallStatus;
+
+    ASSERT(SyscallFunction != NULL);
+    ASSERT(Parameters != NULL);
+
+    syscallStatus = STATUS_NOT_IMPLEMENTED;
+
+    // Because the shadow stack is mandatory we can have the same function call
+    // for all functions with upto 3 parameters (we lose one because of the syscall number)
+    if (NoOfParameters <= SYSCALL_MIN_NO_OF_PARAMS_ON_STACK)
+    {
+        syscallStatus = SyscallFunction(Parameters[0],
+                                        Parameters[1],
+                                        Parameters[2]);
+    }
+    else
+    {
+        switch (NoOfParameters)
+        {
+            case 4:
+                syscallStatus = SyscallFunction(Parameters[0],
+                                                Parameters[1],
+                                                Parameters[2],
+                                                Parameters[3]);
+                break;
+            case 5:
+                syscallStatus = SyscallFunction(Parameters[0],
+                                                Parameters[1],
+                                                Parameters[2],
+                                                Parameters[3],
+                                                Parameters[4]);
+                break;
+            case 6:
+                syscallStatus = SyscallFunction(Parameters[0],
+                                                Parameters[1],
+                                                Parameters[2],
+                                                Parameters[3],
+                                                Parameters[4],
+                                                Parameters[5]);
+                break;
+            case 7:
+                syscallStatus = SyscallFunction(Parameters[0],
+                                                Parameters[1],
+                                                Parameters[2],
+                                                Parameters[3],
+                                                Parameters[4],
+                                                Parameters[5],
+                                                Parameters[6]);
+                break;
+            case 8:
+                syscallStatus = SyscallFunction(Parameters[0],
+                                                Parameters[1],
+                                                Parameters[2],
+                                                Parameters[3],
+                                                Parameters[4],
+                                                Parameters[5],
+                                                Parameters[6],
+                                                Parameters[7]);
+                break;
+            default:
+                NOT_REACHED;
+        }
+    }
+
+    return syscallStatus;
+}

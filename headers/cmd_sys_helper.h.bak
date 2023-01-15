@@ -1,0 +1,16 @@
+#pragma once
+
+void
+CmdDisplaySysInfo(
+    void
+    );
+
+void
+CmdSetIdle(
+    IN  DWORD   Seconds
+    );
+
+void
+CmdGetIdle(
+    void
+    );

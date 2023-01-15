@@ -1,0 +1,117 @@
+#pragma once
+
+#include "list.h"
+#include "ipc.h"
+
+typedef BYTE CPU_AFFINITY;
+
+typedef union _SMP_DESTINATION
+{
+    struct
+    {
+        _Strict_type_match_ APIC_ID ApicId;
+    } Cpu;
+    struct
+    {
+        _Strict_type_match_ CPU_AFFINITY Affinity;
+    } Group;
+
+    // for SmpIpiSendToAllExcludingSelf
+    // SmpIpiSendToAllIncludingSelf and
+    // SmpIpiSendToSelf
+    BYTE        __Reserved;
+} SMP_DESTINATION, *PSMP_DESTINATION;
+
+typedef enum _SMP_IPI_SEND_MODE
+{
+    // uses physical address
+    SmpIpiSendToCpu,
+
+    // sends to running CPU
+    SmpIpiSendToSelf,
+    SmpIpiSendToAllIncludingSelf,
+    SmpIpiSendToAllExcludingSelf,
+
+    // uses logical address
+    SmpIpiSendToGroup,
+
+    SmpIpiSendMax = SmpIpiSendToGroup
+} SMP_IPI_SEND_MODE;
+
+_No_competing_thread_
+void
+SmpPreinit(
+    void
+    );
+
+STATUS
+_No_competing_thread_
+SmpInit(
+    void
+    );
+
+STATUS
+_No_competing_thread_
+SmpSetupLowerMemory(
+    IN          BYTE        NumberOfTssStacks
+    );
+
+void
+_No_competing_thread_
+SmpWakeupAps(
+    void
+    );
+
+void
+_No_competing_thread_
+SmpCleanupLowerMemory(
+    void
+    );
+
+void
+SmpSendPanic(
+    void
+    );
+
+STATUS
+SmpSendGenericIpi(
+    IN      PFUNC_IpcProcessEvent   BroadcastFunction,
+    IN_OPT  PVOID                   Context,
+    IN_OPT  PFUNC_FreeFunction      FreeFunction,
+    IN_OPT  PVOID                   FreeContext,
+    IN      BOOLEAN                 WaitForHandling
+    );
+
+STATUS 
+SmpSendGenericIpiEx(
+    IN      PFUNC_IpcProcessEvent   BroadcastFunction,
+    IN_OPT  PVOID                   Context,
+    IN_OPT  PFUNC_FreeFunction      FreeFunction,
+    IN_OPT  PVOID                   FreeContext,
+    IN      BOOLEAN                 WaitForHandling,
+    IN _Strict_type_match_ 
+            SMP_IPI_SEND_MODE       SendMode,
+    _When_(SendMode == SmpIpiSendToCpu || SendMode == SmpIpiSendToGroup, IN) 
+            SMP_DESTINATION         Destination
+    );
+
+STATUS
+SmpCpuInit(
+    void
+    );
+
+void
+_No_competing_thread_
+SmpGetCpuList(
+    OUT_PTR      PLIST_ENTRY*     CpuList
+    );
+
+DWORD
+SmpGetNumberOfActiveCpus(
+    void
+    );
+
+void
+SmpNotifyCpuWakeup(
+    void
+    );

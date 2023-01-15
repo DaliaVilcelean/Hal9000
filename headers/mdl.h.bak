@@ -1,0 +1,25 @@
+#pragma once
+
+PTR_SUCCESS
+PMDL
+MdlAllocate(
+    IN          PVOID           VirtualAddress,
+    IN          DWORD           Length
+    );
+
+void
+MdlFree(
+    INOUT       PMDL            Mdl
+    );
+
+DWORD
+MdlGetNumberOfPairs(
+    IN          PMDL            Mdl
+    );
+
+PTR_SUCCESS
+PMDL_TRANSLATION_PAIR
+MdlGetTranslationPair(
+    IN          PMDL            Mdl,
+    IN          DWORD           Index
+    );

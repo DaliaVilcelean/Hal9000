@@ -1,0 +1,27 @@
+#pragma once
+
+void
+CmdStatFile(
+    IN_Z    char*       File
+    );
+
+void
+CmdMakeDirectory(
+    IN_Z    char*       File
+    );
+
+void
+CmdMakeFile(
+    IN_Z    char*       File
+    );
+
+void
+CmdListDirectory(
+    IN_Z    char*       File,
+    IN      BOOLEAN     Recursive
+    );
+void
+CmdReadFile(
+    IN_Z    char*       File,
+    IN      BOOLEAN     Asynchronous
+    );

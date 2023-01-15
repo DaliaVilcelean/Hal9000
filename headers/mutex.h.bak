@@ -1,0 +1,35 @@
+#pragma once
+
+#include "list.h"
+#include "synch.h"
+
+typedef struct _MUTEX
+{
+    LOCK                MutexLock;
+
+    BYTE                CurrentRecursivityDepth;
+    BYTE                MaxRecursivityDepth;
+
+    LIST_ENTRY          WaitingList;
+    struct _THREAD*     Holder;
+} MUTEX, *PMUTEX;
+
+void
+MutexInit(
+    OUT         PMUTEX      Mutex,
+    IN          BOOLEAN     Recursive
+    );
+
+ACQUIRES_EXCL_AND_REENTRANT_LOCK(*Mutex)
+REQUIRES_NOT_HELD_LOCK(*Mutex)
+void
+MutexAcquire(
+    INOUT       PMUTEX      Mutex
+    );
+
+RELEASES_EXCL_AND_REENTRANT_LOCK(*Mutex)
+REQUIRES_EXCL_LOCK(*Mutex)
+void
+MutexRelease(
+    INOUT       PMUTEX      Mutex
+    );

@@ -1,0 +1,23 @@
+#pragma once
+
+void
+CmdListNetworks(
+    void
+    );
+
+void
+CmdNetRecv(
+    IN  BOOLEAN     Resend
+    );
+
+void
+CmdNetSend(
+    void
+    );
+
+void
+CmdChangeDevStatus(
+    IN  DEVICE_ID   Device,
+    IN  BOOLEAN     RxEnable,
+    IN  BOOLEAN     TxEnable
+    );

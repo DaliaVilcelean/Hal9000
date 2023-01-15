@@ -1,0 +1,26 @@
+#pragma once
+
+typedef struct _INTERRUPT_STACK
+{
+    QWORD                       ErrorCode;
+    QWORD                       Rip;
+    QWORD                       CS;
+    QWORD                       RFLAGS;
+    QWORD                       Rsp;
+    QWORD                       SS;
+} INTERRUPT_STACK, *PINTERRUPT_STACK;
+
+typedef
+BOOLEAN
+(__cdecl FUNC_IsrRoutine)(
+    IN_OPT  PVOID               Context
+    );
+
+typedef FUNC_IsrRoutine*        PFUNC_IsrRoutine;
+
+STATUS
+IsrInstallEx(
+    IN      BYTE                Vector,
+    IN      PFUNC_IsrRoutine    IsrRoutine,
+    IN_OPT  PVOID               Context
+    );

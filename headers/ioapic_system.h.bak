@@ -1,0 +1,42 @@
+#pragma once
+
+#include "apic_common.h"
+
+void
+IoApicSystemPreinit(
+    void
+    );
+
+STATUS
+IoApicSystemInit(
+    void
+    );
+
+void
+IoApicSystemEnableRegisteredInterrupts(
+    void
+    );
+
+STATUS
+IoApicSystemSetInterrupt(
+    IN      BYTE                    Irq,
+    IN      BYTE                    Vector,
+    IN _Strict_type_match_
+            APIC_DESTINATION_MODE   DestinationMode,
+    IN _Strict_type_match_
+            APIC_DELIVERY_MODE      DeliveryMode,
+    IN      APIC_ID                 Destination,
+    IN      BOOLEAN                 Overwrite
+    );
+
+STATUS
+IoApicSystemGetVectorForIrq(
+    IN      BYTE                    Irq,
+    OUT     PBYTE                   Vector
+    );
+
+__declspec(deprecated)
+void
+IoApicSystemSendEOI(
+    IN      BYTE                Vector
+    );

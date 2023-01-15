@@ -1,0 +1,63 @@
+#pragma once
+
+#include "ex_event.h"
+#include "mutex.h"
+
+typedef enum _EX_TIMER_TYPE
+{
+    ExTimerTypeAbsolute,
+    ExTimerTypeRelativeOnce,
+    ExTimerTypeRelativePeriodic,
+    ExTimerTypeMax = ExTimerTypeRelativePeriodic
+} EX_TIMER_TYPE;
+
+typedef struct _EX_TIMER
+{
+    // absolute time
+    QWORD           TriggerTimeUs;
+
+    // valid only if timer is periodic
+    QWORD           ReloadTimeUs;
+
+    EX_TIMER_TYPE   Type;
+    EX_EVENT        Event;
+
+    MUTEX           TimerLock;
+
+    BOOLEAN         TimerStarted;
+    BOOLEAN         TimerUninited;
+    LIST_ENTRY      NextTimer;
+} EX_TIMER, *PEX_TIMER;
+
+STATUS
+ExTimerInit(
+    OUT     PEX_TIMER       Timer,
+    IN      EX_TIMER_TYPE   Type,
+    IN      QWORD           TimeUs
+    );
+
+void
+ExTimerStart(
+    IN      PEX_TIMER       Timer
+    );
+
+void
+ExTimerStop(
+    IN      PEX_TIMER       Timer
+    );
+
+void
+ExTimerWait(
+    INOUT   PEX_TIMER       Timer
+    );
+
+void
+ExTimerUninit(
+    INOUT   PEX_TIMER       Timer
+    );
+
+INT64
+ExTimerCompareTimers(
+    IN      PEX_TIMER     FirstElem,
+    IN      PEX_TIMER     SecondElem
+    );

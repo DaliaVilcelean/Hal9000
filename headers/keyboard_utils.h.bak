@@ -1,0 +1,13 @@
+#pragma once
+
+KEYCODE
+getch(
+    void
+    );
+
+void
+gets_s(
+    OUT_WRITES_Z(BufferSize)    char*       Buffer,
+    IN                          DWORD       BufferSize,
+    OUT                         DWORD*      UsedSize
+    );

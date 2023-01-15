@@ -1,0 +1,167 @@
+#pragma once
+
+#include "mmu.h"
+#include "pte.h"
+
+typedef struct _PAGING_DATA
+{
+    PHYSICAL_ADDRESS        BasePhysicalAddress;
+
+    // because we don't have any functions to unmap
+    // paging structures (and we probably won't need to)
+    // there is no use in using a bitmap
+    DWORD                   NumberOfFrames;
+    DWORD                   CurrentIndex;
+
+    BYTE                    WriteBackIndex;
+    BYTE                    UncacheableIndex;
+} PAGING_DATA, *PPAGING_DATA;
+
+typedef DWORD               VMM_ALLOC_TYPE;
+
+#define VMM_ALLOC_TYPE_RESERVE      0x1
+#define VMM_ALLOC_TYPE_COMMIT       0x2
+#define VMM_ALLOC_TYPE_NOT_LAZY     0x4
+
+typedef DWORD               VMM_FREE_TYPE;
+
+#define VMM_FREE_TYPE_DECOMMIT      0x1
+#define VMM_FREE_TYPE_RELEASE       0x2
+
+_No_competing_thread_
+void
+VmmPreinit(
+    void
+    );
+
+_No_competing_thread_
+STATUS
+VmmInit(
+    IN      PVOID                   BaseAddress
+    );
+
+//******************************************************************************
+// Function:     VmmMapMemoryEx
+// Description:  Maps a PA using the received paging data into virtual space.
+// Returns:      PVOID - Virtual Address to which PhysicalAddress was mapped
+// Parameter:    IN PPAGING_DATA PagingData - Paging tables to use
+// Parameter:    IN PHYSICAL_ADDRESS PhysicalAddress - address to map
+// Parameter:    IN DWORD Size - PAGE_SIZE aligned number of bytes to map
+// Parameter:    IN PAGE_RIGHTS PageRights
+// Parameter:    IN BOOLEAN Invalidate
+// Parameter:    IN BOOLEAN Uncacheable
+//******************************************************************************
+PTR_SUCCESS
+PVOID
+VmmMapMemoryEx(
+    IN      PPAGING_DATA            PagingData,
+    IN      PHYSICAL_ADDRESS        PhysicalAddress,
+    IN      DWORD                   Size,
+    IN      PAGE_RIGHTS             PageRights,
+    IN      BOOLEAN                 Invalidate,
+    IN      BOOLEAN                 Uncacheable
+    );
+
+//******************************************************************************
+// Function:     VmmMapMemoryInternal
+// Description:  Same as VmmMapMemoryEx except it maps the address to an
+//               explicit virtual address.
+/// NOTE:        This should be used used only in the vmm and mmu files
+//******************************************************************************
+void
+VmmMapMemoryInternal(
+    IN      PPAGING_DATA            PagingData,
+    IN      PHYSICAL_ADDRESS        PhysicalAddress,
+    IN      DWORD                   Size,
+    IN      PVOID                   BaseAddress,
+    IN      PAGE_RIGHTS             PageRights,
+    IN      BOOLEAN                 Invalidate,
+    IN      BOOLEAN                 Uncacheable
+    );
+
+//******************************************************************************
+// Function:     VmmUnmapMemoryEx
+// Description:  Unmaps a previously mapped VA with VmmMapMemoryEx or
+//               VmmMapMemoryInternal
+// Returns:      void
+// Parameter:    IN PML4 Cr3 - paging tables
+// Parameter:    IN PVOID VirtualAddress
+// Parameter:    IN DWORD Size - PAGE_SIZE aligned number of bytes to unmap
+//******************************************************************************
+void
+VmmUnmapMemoryEx(
+    IN      PML4                    Cr3,
+    IN      PVOID                   VirtualAddress,
+    IN      DWORD                   Size,
+    IN      BOOLEAN                 ReleaseMemory
+    );
+
+PTR_SUCCESS
+PHYSICAL_ADDRESS
+VmmGetPhysicalAddress(
+    IN      PML4                    Cr3,
+    IN      PVOID                   VirtualAddress
+    );
+
+STATUS
+VmmSetupPageTables(
+    INOUT   PPAGING_DATA            PagingData,
+    IN      PVOID                   BaseAddress,
+    IN      DWORD                   FramesReserved
+    );
+
+void
+VmmChangeCr3(
+    IN      PHYSICAL_ADDRESS        Pml4Base
+    );
+
+#define VmmAllocRegion(Addr,Size,Type,Rights)       VmmAllocRegionEx((Addr),(Size),(Type),(Rights),FALSE)
+
+//******************************************************************************
+// Function:     VmmAllocRegion
+// Description:  Allocates a region of virtual memory.
+// Returns:      PVOID - Virtual address of the memory allocated
+// Parameter:    IN_OPT PVOID BaseAddress
+// Parameter:    IN QWORD Size
+// Parameter:    IN VMM_ALLOC_TYPE AllocType - a mask of the following values:
+//               VMM_ALLOC_TYPE_RESERVED - reserves the virtual address space
+//               VMM_ALLOC_TYPE_COMMIT - commits the virtual address
+// Parameter:    IN PAGE_RIGHTS Rights
+/// NOTE:        When an address is committed it is not mapped to physical
+///              memory, it will be mapped on the first #PF
+//******************************************************************************
+PTR_SUCCESS
+PVOID
+VmmAllocRegionEx(
+    IN_OPT  PVOID                   BaseAddress,
+    IN      QWORD                   Size,
+    IN      VMM_ALLOC_TYPE          AllocType,
+    IN      PAGE_RIGHTS             Rights,
+    IN      BOOLEAN                 Uncacheable
+    );
+
+//******************************************************************************
+// Function:     VmmFreeRegion
+// Description:  Frees a region of memory previously allocated.
+// Returns:      void
+// Parameter:    IN PVOID Address
+// Parameter:    IN QWORD Size
+// Parameter:    IN VMM_FREE_TYPE FreeType - can have one of two values (xor):
+//               VMM_FREE_TYPE_DECOMMIT - de-commits the virtual address
+//               VMM_FREE_TYPE_RELEASE - releases the whole reservation
+//******************************************************************************
+void
+VmmFreeRegion(
+    IN      PVOID                   Address,
+_When_(VMM_FREE_TYPE_RELEASE == FreeType, IN_OPT)
+_When_(VMM_FREE_TYPE_RELEASE != FreeType, IN)
+            QWORD                   Size,
+    IN      VMM_FREE_TYPE           FreeType
+    );
+
+BOOLEAN
+VmmSolvePageFault(
+    IN      PPAGING_DATA            PagingData,
+    IN      PVOID                   FaultingAddress,
+    IN      PAGE_RIGHTS             RightsRequested
+    );

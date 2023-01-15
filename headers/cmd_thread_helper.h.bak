@@ -1,0 +1,61 @@
+#pragma once
+
+#include "smp.h"
+#include "ex_timer.h"
+
+void
+CmdListCpus(
+    void
+    );
+
+void
+CmdListThreads(
+    void
+    );
+
+void
+CmdYield(
+    void
+    );
+
+void
+CmdRunTest(
+    IN_Z        char*       TestName,
+    IN          DWORD       NumberOfThreads
+    );
+
+void
+CmdSendIpi(
+    IN          SMP_IPI_SEND_MODE   SendMode,
+    IN          SMP_DESTINATION     Destination,
+    IN          BOOLEAN             WaitForTermination
+    );
+
+void
+CmdListCpuInterrupts(
+    void
+    );
+
+void
+CmdTestTimer(
+    IN          EX_TIMER_TYPE       TimerType,
+    IN          QWORD               RelativeTime,
+    IN          DWORD               NumberOfTimes
+    );
+
+void
+CmdCpuid(
+    IN          DWORD               Index,
+    IN          DWORD               SubIndex
+    );
+
+void
+CmdRdmsr(
+    IN          DWORD               Index
+    );
+
+void
+CmdWrmsr(
+    IN          DWORD               Index,
+    IN          QWORD               Value
+    );

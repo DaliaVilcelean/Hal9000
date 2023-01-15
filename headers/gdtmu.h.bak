@@ -1,0 +1,36 @@
+#pragma once
+
+STATUS
+GdtMuInit(
+    void
+    );
+
+STATUS
+GdtMuInstallTssDescriptor(
+    OUT     struct _TSS*    Tss,
+    IN_RANGE(1,NO_OF_IST)
+            BYTE            NumberOfStacks,
+    IN_READS(NumberOfStacks)
+            PVOID*          Stacks,
+    OUT_OPT WORD*           Selector
+    );
+
+WORD
+GdtMuGetCS64(
+    void
+    );
+
+WORD
+GdtMuGetDS64(
+    void
+    );
+
+WORD
+GdtMuGetCS32(
+    void
+    );
+
+WORD
+GdtMuGetDS32(
+    void
+    );

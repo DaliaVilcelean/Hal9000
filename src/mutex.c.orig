@@ -1,0 +1,239 @@
+#include "HAL9000.h"
+#include "thread_internal.h"
+#include "mutex.h"
+
+#define MUTEX_MAX_RECURSIVITY_DEPTH         MAX_BYTE
+
+// Used for sorting threads in descending order of priorities.
+static
+INT64
+CmpThreadPriority(
+    IN      PLIST_ENTRY     FirstElem,
+    IN      PLIST_ENTRY     SecondElem
+);
+
+_No_competing_thread_
+void
+MutexInit(
+    OUT         PMUTEX      Mutex,
+    IN          BOOLEAN     Recursive
+    )
+{
+    ASSERT( NULL != Mutex );
+
+    memzero(Mutex, sizeof(MUTEX));
+
+    LockInit(&Mutex->MutexLock);
+
+    InitializeListHead(&Mutex->WaitingList);
+
+    Mutex->MaxRecursivityDepth = Recursive ? MUTEX_MAX_RECURSIVITY_DEPTH : 1;
+}
+
+void
+TryDonatePriority(
+    IN          PTHREAD     Thread,
+    IN          THREAD_PRIORITY Priority
+    )
+{
+    INTR_STATE oldState;
+    INTR_STATE oldState2;
+    INTR_STATE oldState3;
+    PTHREAD waitingForThread = NULL;
+    LockAcquire(&Thread->PriorityDonationLock, &oldState);
+    if (Thread->DonatedPriority < Priority)
+    {
+        Thread->DonatedPriority = Priority;
+        LockRelease(&Thread->PriorityDonationLock, oldState);
+
+        // Chained donation
+        if (Thread->State == ThreadStateBlocked)
+        {
+            ASSERT(NULL != Thread->WaitingForMutex);
+            ASSERT(NULL != Thread->WaitingForMutex->Holder);
+            waitingForThread = Thread->WaitingForMutex->Holder;
+            TryDonatePriority(waitingForThread, ThreadGetPriority(Thread));
+
+            // If a thread receives priority donation and it is blocked,
+            // it should be reinserted in the ordered waiting list.
+            LockAcquire(&Thread->WaitingForMutex->MutexLock, &oldState2);
+            LockAcquire(&waitingForThread->PriorityDonationLock, &oldState3);
+
+            RemoveEntryList(&Thread->ReadyList);
+            InsertOrderedList(&Thread->WaitingForMutex->WaitingList, &Thread->ReadyList, &CmpThreadPriority);
+
+            LockRelease(&waitingForThread->PriorityDonationLock, oldState3);
+            LockRelease(&Thread->WaitingForMutex->MutexLock, oldState2);
+        }
+        else if (ThreadStateReady == Thread->State)
+        {
+            //TODO: re-insert into the ordered ready list + check if there is other RUNNING thread (not the current one,
+            // since it has disabled interrupts) with lower priority to schedule. This thread will yield soon anyways
+        }
+    }
+    else
+    {
+        LockRelease(&Thread->PriorityDonationLock, oldState);
+    }
+}
+
+INT64
+CmpThreadPriority(
+    IN      PLIST_ENTRY     FirstElem,
+    IN      PLIST_ENTRY     SecondElem
+    )
+{
+    PTHREAD firstThread = CONTAINING_RECORD(FirstElem, THREAD, ReadyList);
+    PTHREAD secondThread = CONTAINING_RECORD(SecondElem, THREAD, ReadyList);
+
+    THREAD_PRIORITY firstPriority = ThreadGetPriority(firstThread);
+    THREAD_PRIORITY secondPriority = ThreadGetPriority(secondThread);
+
+    return secondPriority - firstPriority;
+}
+
+STATUS
+FindMaxPriority(
+    IN          PLIST_ENTRY     ListEntry,
+    IN_OPT      PVOID           FunctionContext
+    )
+{
+    ASSERT(FunctionContext != NULL);
+    PMUTEX pMutex = CONTAINING_RECORD(ListEntry, MUTEX, AcquiredMutexesListEntry);
+    PTHREAD highestPriorityThread = NULL;
+    THREAD_PRIORITY* pMaxPriorityUntilNow = FunctionContext;
+    THREAD_PRIORITY currentPriority;
+
+    if (!IsListEmpty(&pMutex->WaitingList))
+    {
+        highestPriorityThread = CONTAINING_RECORD(pMutex->WaitingList.Flink, THREAD, ReadyList);
+        currentPriority = ThreadGetPriority(highestPriorityThread);
+        if (currentPriority > *pMaxPriorityUntilNow)
+        {
+            *pMaxPriorityUntilNow = currentPriority;
+        }
+    }
+
+    return STATUS_SUCCESS;
+}
+
+void RefreshDonatedPriority(
+    IN          PTHREAD     Thread
+    )
+{
+    ASSERT(GetCurrentThread() == Thread);
+    INTR_STATE oldState;
+    THREAD_PRIORITY newDonatedPriority = ThreadPriorityLowest;
+    LockAcquire(&Thread->PriorityDonationLock, &oldState);
+    if (!IsListEmpty(&Thread->AcquiredMutexesList))
+    {
+        ASSERT(STATUS_SUCCESS == ForEachElementExecute(
+            &Thread->AcquiredMutexesList,
+            &FindMaxPriority,
+            &newDonatedPriority,
+            TRUE)
+        );
+    }
+    Thread->DonatedPriority = newDonatedPriority;
+    LockRelease(&Thread->PriorityDonationLock, oldState);
+
+    //TODO: We may want to Yield here!
+}
+
+ACQUIRES_EXCL_AND_REENTRANT_LOCK(*Mutex)
+REQUIRES_NOT_HELD_LOCK(*Mutex)
+void
+MutexAcquire(
+    INOUT       PMUTEX      Mutex
+    )
+{
+    INTR_STATE dummyState;
+    INTR_STATE oldState;
+    PTHREAD pCurrentThread = GetCurrentThread();
+
+    ASSERT( NULL != Mutex);
+    ASSERT( NULL != pCurrentThread );
+
+    if (pCurrentThread == Mutex->Holder)
+    {
+        ASSERT( Mutex->CurrentRecursivityDepth < Mutex->MaxRecursivityDepth );
+
+        Mutex->CurrentRecursivityDepth++;
+        return;
+    }
+
+    oldState = CpuIntrDisable();
+
+    LockAcquire(&Mutex->MutexLock, &dummyState );
+    if (NULL == Mutex->Holder)
+    {
+        Mutex->Holder = pCurrentThread;
+        Mutex->CurrentRecursivityDepth = 1;
+    }
+    while (Mutex->Holder != pCurrentThread)
+    {
+        InsertOrderedList(&Mutex->WaitingList, &pCurrentThread->ReadyList, &CmpThreadPriority);
+        pCurrentThread->WaitingForMutex = Mutex;
+        TryDonatePriority(Mutex->Holder, ThreadGetPriority(pCurrentThread));
+        ThreadTakeBlockLock();
+        LockRelease(&Mutex->MutexLock, dummyState);
+        ThreadBlock();
+        LockAcquire(&Mutex->MutexLock, &dummyState );
+    }
+
+    _Analysis_assume_lock_acquired_(*Mutex);
+
+    LockRelease(&Mutex->MutexLock, dummyState);
+
+    InsertTailList(&pCurrentThread->AcquiredMutexesList, &Mutex->AcquiredMutexesListEntry);
+
+    CpuIntrSetState(oldState);
+}
+
+RELEASES_EXCL_AND_REENTRANT_LOCK(*Mutex)
+REQUIRES_EXCL_LOCK(*Mutex)
+void
+MutexRelease(
+    INOUT       PMUTEX      Mutex
+    )
+{
+    INTR_STATE oldState;
+    PLIST_ENTRY pEntry;
+    PTHREAD pCurrentThread = GetCurrentThread();
+
+    ASSERT(NULL != Mutex);
+    ASSERT(pCurrentThread == Mutex->Holder);
+
+    if (Mutex->CurrentRecursivityDepth > 1)
+    {
+        Mutex->CurrentRecursivityDepth--;
+        return;
+    }
+
+    pEntry = NULL;
+
+    RemoveEntryList(&Mutex->AcquiredMutexesListEntry);
+
+    LockAcquire(&Mutex->MutexLock, &oldState);
+
+    pEntry = RemoveHeadList(&Mutex->WaitingList);
+    if (pEntry != &Mutex->WaitingList)
+    {
+        PTHREAD pThread = CONTAINING_RECORD(pEntry, THREAD, ReadyList);
+
+        // wakeup first thread
+        Mutex->Holder = pThread;
+        Mutex->CurrentRecursivityDepth = 1;
+        ThreadUnblock(pThread);
+    }
+    else
+    {
+        Mutex->Holder = NULL;
+    }
+
+    _Analysis_assume_lock_released_(*Mutex);
+
+    LockRelease(&Mutex->MutexLock, oldState);
+
+    RefreshDonatedPriority(pCurrentThread);
+}

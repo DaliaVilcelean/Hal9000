@@ -1,0 +1,37 @@
+#pragma once
+
+#include "acpi.h"
+
+void
+AcpiInterfacePreinit(
+    void
+    );
+
+STATUS
+AcpiInterfaceInit(
+    void
+    );
+
+STATUS
+AcpiRetrieveNextCpu(
+    IN      BOOLEAN                     RestartSearch,
+    OUT_PTR ACPI_MADT_LOCAL_APIC**      AcpiEntry
+    );
+
+STATUS
+AcpiRetrieveNextIoApic(
+    IN      BOOLEAN                     RestartSearch,
+    OUT_PTR ACPI_MADT_IO_APIC**         AcpiEntry
+    );
+
+STATUS
+AcpiRetrieveNextInterruptOverride(
+    IN      BOOLEAN                         RestartSearch,
+    OUT_PTR ACPI_MADT_INTERRUPT_OVERRIDE**  AcpiEntry
+    );
+
+STATUS
+AcpiRetrieveNextMcfgEntry(
+    IN      BOOLEAN                     RestartSearch,
+    OUT_PTR ACPI_MCFG_ALLOCATION**      AcpiEntry
+);

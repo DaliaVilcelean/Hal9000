@@ -4,6 +4,7 @@
 #include "ref_cnt.h"
 #include "ex_event.h"
 #include "thread.h"
+#include "mutex.h"
 
 typedef enum _THREAD_STATE
 {
@@ -42,6 +43,13 @@ typedef struct _THREAD
 
     // Currently the thread priority is not used for anything
     THREAD_PRIORITY         Priority;
+
+    THREAD_PRIORITY         RealPriority;
+
+    LIST_ENTRY              AcquiredMutexesList;
+
+    PMUTEX                  WaitedMutex;
+
     THREAD_STATE            State;
 
     // valid only if State == ThreadStateTerminated
@@ -89,7 +97,7 @@ typedef struct _THREAD
     // MUST be non-NULL for all threads which belong to user-mode processes
     PVOID                   UserStack;
 
-    struct _PROCESS*        Process;
+    struct _PROCESS*        Process;        
 } THREAD, *PTHREAD;
 
 //******************************************************************************
@@ -271,14 +279,26 @@ SetCurrentThread(
     IN      PTHREAD     Thread
     );
 
-//******************************************************************************
-// Function:     ThreadSetPriority
-// Description:  Sets the thread's priority to new priority. If the
-//               current thread no longer has the highest priority, yields.
-// Returns:      void
-// Parameter:    IN THREAD_PRIORITY NewPriority
-//******************************************************************************
 void
 ThreadSetPriority(
     IN      THREAD_PRIORITY     NewPriority
     );
+
+void
+ThreadRecomputePriority(
+    INOUT   PTHREAD     Thread
+    );
+
+void
+ThreadDonatePriority(
+    INOUT PTHREAD  currentThread,
+    INOUT PTHREAD MutexHolder
+    );
+
+INT64
+(__cdecl ThreadComparePriorityReadyList)
+(   IN      PLIST_ENTRY     FirstElem,
+    IN      PLIST_ENTRY     SecondElem,
+    IN_OPT  PVOID           Context
+    );
+

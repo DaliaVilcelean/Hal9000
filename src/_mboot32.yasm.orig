@@ -1,0 +1,237 @@
+%include "lib.yasm"
+
+;; IMPORTS
+extern HalActivateFpu
+extern Entry64
+
+extern PM32_to_PM64
+extern PM64_to_PM32
+extern CallToRM
+extern LowGdtBase
+
+;; EXPORTS
+global __EntryMultiboot
+
+%define GDT_DESCRIPTOR_ADDRESS                      ( GDT_BASE_ADDRESS + __gdt_base.end - __gdt_base )
+
+; The Multiboot header must be contained completely within the first 8192 bytes of the OS image
+SECTION .mboot
+;;
+;; KERNEL_BASE + 0x400 (this must be the first stuff to be linked into the code segment)
+;;
+multiboot_header:                                       ; check out '3.1.1 The layout of Multiboot header'
+magic           dd MULTIBOOT_HEADER_MAGIC                                   ; 0x0
+flags           dd MULTIBOOT_HEADER_FLAGS                                   ; 0x4
+checksum        dd 0-(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)      ; 0x8
+header_addr     dd MULTIBOOT_BASE                                           ; 0xc
+load_addr       dd KERNEL_BASE                                              ; 0x10
+load_end_addr   dd 0                                                        ; 0x14
+bss_end_addr    dd 0                                                        ; 0x18
+entry_addr      dd MULTIBOOT_ENTRY_POINT                                    ; 0x1c
+mode_type       dd 0
+width           dd 0
+height          dd 0
+depth           dd 0
+
+gMultiBootStruct:                                       ; reserve space for the multiboot info structure (will copy here)
+times MULTIBOOT_INFO_STRUCT_SIZE db 'M'                 ; check out '3.3 Boot information format'
+
+;; pad until 0x100
+times ( MULTIBOOT_SECTION_SIZE - MULTIBOOT_HEADER_SIZE - MULTIBOOT_INFO_STRUCT_SIZE ) db 'A'
+
+;;
+;; KERNEL_BASE + 0x500
+;;
+__gdt_base:                                             ; GDT with 1+6+2 entries
+.null               dq      0
+.data64             dq      GDT_DESC_DATA64                 ; Data segment
+.code64             dq      GDT_DESC_CODE64                 ; Code segment, 64 bit, execute / read, present
+.data32             dq      GDT_DESC_DATA32
+.code32             dq      GDT_DESC_CODE32
+.data16             dq      GDT_DESC_DATA16
+.code16             dq      GDT_DESC_CODE16
+.end
+
+; size and address of __gdt_base
+__gdtr:
+.gdt_size        dw  ( __gdt_base.end - __gdt_base - 1 )
+.gdt_address     dq  GDT_BASE_ADDRESS
+.end
+
+times ( GDT_SECTION_SIZE - ( __gdtr.end - __gdt_base) ) db 'G'
+
+;;
+;; KERNEL_BASE + 0x700
+;;
+data:
+gAsmParameters          times    ASM_PARAMETERS_size db 'P'
+
+data_end:
+
+times ( DATA_SECTION_SIZE - ( data_end- data )) db 'D'
+
+;;
+;; KERNEL_BASE + 0x2000
+;; PML4
+__pml4_table:
+dq              PDP_TABLE_BASE | P_BIT | RW_BIT   ; entry for 0 - 512G, PDP
+times KERNEL_PML4_INDEX - 1 dq 0
+dq              PDP_TABLE_BASE | P_BIT | RW_BIT   ; entry for 1T - 1,5T, PDP
+times PTE_PER_TABLE - KERNEL_PML4_INDEX - 1 dq 0
+
+;; KERNEL_BASE + 0x3000
+;; PDPT
+__pdp_table_1t:
+dq              PD_TABLE_LOW_1GB_BASE | P_BIT | RW_BIT
+times 511 dq 0
+
+;; KERNEL_BASE + 0x4000
+;; PDT
+__pd_table:
+dq              PT_TABLE_LOW_2MB_BASE | P_BIT | RW_BIT   ; entry for 0 - 2M, PT, using PT to avoid mapping first 4K (do NOT map NULL pointer)
+times KERNEL_NO_OF_PAGES_BEFORE dq 0
+dq              KERNEL_BASE | PS_BIT | P_BIT | RW_BIT
+
+%assign     i   KERNEL_BASE + PD_ENTRY_LENGTH
+%rep KERNEL_NO_OF_PAGES_AFTER - 1
+dq          i | XD_BIT | PS_BIT | P_BIT | RW_BIT
+%assign     i   i + PD_ENTRY_LENGTH
+%endrep
+
+;; KERNEL_BASE + 0x5000
+;; PT for first 2 MB of memory
+__pt_table_low_2mb:
+times 1     dq 0                        ; P = 0, NOT preset, to avoid NULL pointers
+                                        ; will be dynamically generated
+%assign     i   0x1000
+%rep 511
+dq          i | P_BIT | RW_BIT
+%assign     i   i + PAGE_SIZE
+%endrep
+
+;; KERNEL_BASE + 0x6000
+;;
+[bits 32]
+__EntryMultiboot:
+    ; make sure interrupts are disabled
+    cli
+    hlt
+
+    ; simply echo something to the screen, by direct memory write to 80x25 text mode VGA video mem (0xB8000)
+    mov     [0x000B8000], DWORD '1111'      ; signal our presence
+
+    ; setup initial ESP, to have stack
+    mov     esp, INITIAL_TOP_OF_STACK
+
+    ; check if we were loaded by multiboot
+    cmp     eax, MULTIBOOT_LOADER_MAGIC
+    jz      .mb_load
+
+    ; if we get here it means we were not loaded by the MB loader
+    ; we don't know any other way of loading
+    mov     eax, 'EEEE'                     ; signal error
+    mov     [0x000B8000], eax
+    cli
+    hlt
+
+.mb_load:
+
+    ; multiboot loaded us
+    mov     [0x000B8004], DWORD '2222'      ; signal our presence
+
+    ; it is best to load our own GDT
+    lgdt    [GDT_DESCRIPTOR_ADDRESS]
+
+    ; reload CS
+    jmp     GDT_DESC(__gdt_base,code32):MULTIBOOT_ENTRY_POINT + ( __EntryMultiboot.new_gdt - __EntryMultiboot )
+.new_gdt:
+    mov     ax,         GDT_DESC(__gdt_base,data32)
+    mov     ss,         ax
+    mov     ds,         ax
+    mov     es,         ax
+    mov     fs,         ax
+    mov     gs,         ax
+
+    ; we copy the structure passed to us by the multiboot loader
+    mov     esi, ebx
+    mov     edi, MULTIBOOT_INFO_ADDRESS
+    mov     ecx, MULTIBOOT_INFO_STRUCT_SIZE
+    cld
+    rep     movsb
+
+    mov     [0x000B8008], DWORD '3333'      ; signal our presence
+
+    ; we place code under 1MB
+    ; our trampoline
+    mov     esi, MULTIBOOT_BASE + ( LowGdtBase - multiboot_header )
+    mov     edi, LOW_GDT_BASE_ADDRESS
+    mov     ecx, LOW_MEMORY_LENGTH
+    cld
+    rep     movsb
+
+    mov     esp, LOW_MEMORY_STACK_TOP
+
+    callproc    CallToRM, LOW_RETRIEVE_INT15_MAP_ADDRESS, 3, 0, LOW_MEMORY_MAP_ENTRIES_ADDRESS, LOW_MEMORY_MAP_NUMBER_ADDRESS
+
+    ; retrieve BDA serial port entries
+    lea     edi,    [DATA_BASE_ADDRESS + ASM_PARAMETERS_DATA_OFFSET + ASM_PARAMETERS.BiosSerialPorts]
+    mov     esi,    BIOS_SERIAL_PORT_ADDRESS
+    mov     ecx,    BIOS_NO_OF_SERIAL_PORTS
+    cld
+    rep     movsw
+
+    sub     esp,                                                TRANSITION_CONFIG_size
+    mov     ecx,                                                esp
+
+    setup_transition_config_32 ecx, GDT_DESCRIPTOR_ADDRESS, INITIAL_TOP_OF_STACK, GDT_DESC(__gdt_base,code64), GDT_DESC(__gdt_base,data64), INITIAL_TOP_OF_STACK_1T & 0xFFFFFFFF, INITIAL_TOP_OF_STACK_1T >> 32, PML4_TABLE_BASE
+
+; after this function call we'll be in 64 bit mode
+    call    PM32_to_PM64
+[bits 64]
+;
+; now we are using final 1T virtual addresses, full x64, have an 8K stack in place, so are ready to jump to our C code
+;
+call_final:
+    call_func_64    HalActivateFpu
+
+    call            PlaceInformationInParameters
+
+    call_func_64    Entry64, QWORD 1, QWORD gAsmParameters
+
+.never:
+    cli
+    hlt
+    jmp     .never
+
+
+[bits 64]
+PlaceInformationInParameters:
+; we set the pointer to the multiboot information structure
+    mov     rax,    QWORD gAsmParameters + ASM_PARAMETERS.MultibootInformation
+    mov     rbx,    MULTIBOOT_INFO_ADDRESS
+    mov     [rax],  rbx
+
+    mov     rax,    QWORD gAsmParameters + ASM_PARAMETERS.KernelBaseAddress
+    mov     rbx,    QWORD KERNEL_BASE_VIRTUAL
+    mov     [rax],  rbx
+
+    mov     rax,    QWORD gAsmParameters + ASM_PARAMETERS.KernelSize
+    mov     rbx,    QWORD KERNEL_LENGTH
+    mov     [rax],  rbx
+
+    mov     rax,    QWORD gAsmParameters + ASM_PARAMETERS.VirtualToPhysicalOffset
+    mov     rbx,    QWORD PA_2_VA_DIFFERENCE
+    mov     [rax],  rbx
+
+    mov     rax,    QWORD gAsmParameters + ASM_PARAMETERS.MemoryMapEntries
+    xor     ebx,    ebx
+    mov     bx,     [LOW_MEMORY_MAP_NUMBER_ADDRESS]
+    mov     [rax],  ebx
+
+    mov     rax,    QWORD gAsmParameters + ASM_PARAMETERS.MemoryMapAddress
+    mov     rbx,    LOW_MEMORY_MAP_ENTRIES_ADDRESS
+    mov     [rax],  rbx
+
+    ret
+
+.end:

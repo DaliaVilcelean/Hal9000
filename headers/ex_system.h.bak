@@ -1,0 +1,26 @@
+#pragma once
+
+#include "ex_timer.h"
+
+_No_competing_thread_
+void
+ExSystemPreinit(
+    void
+    );
+
+_No_competing_thread_
+STATUS
+ExSystemInit(
+    void
+    );
+
+void
+ExSystemTimerTick(
+    void
+    );
+
+void
+ExSystemMonitorTimer(
+    INOUT   PEX_TIMER   Timer,
+    IN      BOOLEAN     Start
+    );

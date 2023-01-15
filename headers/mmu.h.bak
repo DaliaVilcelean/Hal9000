@@ -1,0 +1,143 @@
+#pragma once
+
+#include "mem_structures.h"
+
+#define MmuMapMemory(Pa,Sz)         MmuMapMemoryEx((Pa),(Sz),PAGE_RIGHTS_READWRITE, FALSE, FALSE)
+#define MmuUnmapMemory(Va,Sz)       MmuUnmapMemoryEx((Va),(Sz),FALSE)
+
+void
+MmuPreinitSystem(
+    void
+    );
+
+STATUS
+MmuInitSystem(
+    IN          PVOID                   KernelBaseAddress,
+    IN          DWORD                   KernelSize,
+    IN          PHYSICAL_ADDRESS        MemoryEntries,
+    IN          DWORD                   NumberOfMemoryEntries
+    );
+
+void
+MmuDiscardIdentityMappings(
+    void
+    );
+
+STATUS
+MmuInitThreadingSystem(
+    void
+    );
+
+//******************************************************************************
+// Function:     MmuGetTotalSystemMemory
+// Description:  
+// Returns:      QWORD - Returns the number of bytes of physical memory
+//               available in the system.
+// Parameter:    void
+//******************************************************************************
+QWORD
+MmuGetTotalSystemMemory(
+    void
+    );
+
+PHYSICAL_ADDRESS
+MmuGetHighestPhysicalMemoryAddress(
+    void
+    );
+
+//******************************************************************************
+// Function:     MmuMapMemoryEx
+// Description:  Maps a physical address range into virtual address space.
+// Returns:      PVOID
+// Parameter:    IN PHYSICAL_ADDRESS PhysicalAddress
+// Parameter:    IN DWORD Size
+// Parameter:    IN PAGE_RIGHTS PageRights
+// Parameter:    IN BOOLEAN Invalidate
+// Parameter:    IN BOOLEAN Uncacheable
+//******************************************************************************
+PTR_SUCCESS
+PVOID
+MmuMapMemoryEx(
+    IN      PHYSICAL_ADDRESS        PhysicalAddress,
+    IN      DWORD                   Size,
+    IN      PAGE_RIGHTS             PageRights,
+    IN      BOOLEAN                 Invalidate,
+    IN      BOOLEAN                 Uncacheable
+    );
+
+//******************************************************************************
+// Function:     MmuMapMemoryInternal
+// Description:  Maps a physical address range into the specified virtual 
+//               address space.
+// Returns:      void
+// Parameter:    IN PHYSICAL_ADDRESS PhysicalAddress
+// Parameter:    IN DWORD Size
+// Parameter:    IN PAGE_RIGHTS PageRights
+// Parameter:    IN PVOID VirtualAddress
+// Parameter:    IN BOOLEAN Invalidate
+// Parameter:    IN BOOLEAN Uncacheable
+/// NOTE:        This should only be used by ap_tramp and no other modules.
+//******************************************************************************
+void
+MmuMapMemoryInternal(
+    IN      PHYSICAL_ADDRESS        PhysicalAddress,
+    IN      DWORD                   Size,
+    IN      PAGE_RIGHTS             PageRights,
+    IN      PVOID                   VirtualAddress,
+    IN      BOOLEAN                 Invalidate,
+    IN      BOOLEAN                 Uncacheable
+    );
+
+//******************************************************************************
+// Function:     MmuUnmapMemory
+// Description:  Unmaps a previously mapped memory region.
+// Returns:      void
+// Parameter:    IN PVOID VirtualAddress
+// Parameter:    IN DWORD Size
+//******************************************************************************
+void
+MmuUnmapMemoryEx(
+    IN      PVOID                   VirtualAddress,
+    IN      DWORD                   Size,
+    IN      BOOLEAN                 ReleaseMemory
+    );
+
+void
+MmuReleaseMemory(
+    IN          PHYSICAL_ADDRESS        PhysicalAddr,
+    IN          DWORD                   NoOfFrames
+    );
+
+PTR_SUCCESS
+PHYSICAL_ADDRESS
+MmuGetPhysicalAddress(
+    IN      PVOID                   VirtualAddress
+    );
+
+_Always_(_When_(IsBooleanFlagOn(Flags, PoolAllocatePanicIfFail), RET_NOT_NULL))
+PTR_SUCCESS
+PVOID
+MmuAllocatePoolWithTag(
+    IN      DWORD                   Flags,
+    IN      DWORD                   AllocationSize,
+    IN      DWORD                   Tag,
+    IN      DWORD                   AllocationAlignment
+    );
+
+void
+MmuFreePoolWithTag(
+    IN      PVOID                   MemoryAddress,
+    IN      DWORD                   Tag
+    );
+
+void
+MmuProbeMemory(
+    IN      PVOID                   Buffer,
+    IN      DWORD                   NumberOfBytes
+    );
+
+BOOLEAN
+MmuSolvePageFault(
+    IN      PVOID                   FaultingAddress,
+    IN      DWORD                   ErrorCode
+    );
