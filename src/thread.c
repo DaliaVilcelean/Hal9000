@@ -667,7 +667,12 @@ ThreadSetPriority(
 {
     ASSERT(ThreadPriorityLowest <= NewPriority && NewPriority <= ThreadPriorityMaximum);
 
-    GetCurrentThread()->Priority = NewPriority;
+    PTHREAD pThread = GetCurrentThread();
+    pThread->RealPriority = NewPriority;
+    // if the new assigned priority is greater then the effective priority, recompute the priority of the current thread
+    if (NewPriority > pThread->Priority) {
+        ThreadRecomputePriority( pThread );
+    }
 }
 
 STATUS
@@ -800,6 +805,10 @@ _ThreadInit(
         pThread->Id = _ThreadSystemGetNextTid();
         pThread->State = ThreadStateBlocked;
         pThread->Priority = Priority;
+        pThread->RealPriority = Priority;
+        pThread->WaitedMutex = NULL;
+
+        InitializeListHead(&pThread->AcquiredMutexesList);
 
         LockInit(&pThread->BlockLock);
 
@@ -1245,4 +1254,114 @@ _ThreadKernelFunction(
 
     ThreadExit(exitStatus);
     NOT_REACHED;
+}
+
+
+INT64 
+(__cdecl ThreadComparePriority)(
+    IN PLIST_ENTRY first,
+    IN PLIST_ENTRY second,
+    IN_OPT PVOID context
+)
+{
+    UNREFERENCED_PARAMETER(context);
+
+    THREAD_PRIORITY firstThreadPriority  = ThreadGetPriority(
+        CONTAINING_RECORD(  first, THREAD, ReadyList ) 
+    );
+    THREAD_PRIORITY secondThreadPriority = ThreadGetPriority( 
+        CONTAINING_RECORD( second, THREAD, ReadyList ) 
+    );
+
+    if ( firstThreadPriority < secondThreadPriority ) {
+        return 1;
+    } else {
+        return firstThreadPriority == secondThreadPriority ? 0 : -1;
+    }
+
+}
+
+// Used as context for preserving the maximum priority
+typedef struct myContext
+{
+    THREAD_PRIORITY maxPriority;
+} myContext, * myPContext;
+
+// Get The maximum priority through the context on a given list
+STATUS 
+(__cdecl RecomputePriorityOnList)(
+    IN PLIST_ENTRY          entry,
+    IN_OPT PVOID            context
+)
+{
+    ASSERT( context != NULL );
+    THREAD_PRIORITY myPriority = ( (myPContext) context )->maxPriority;
+    THREAD_PRIORITY currentPriority = ThreadGetPriority( CONTAINING_RECORD( entry, THREAD, ReadyList ) );
+
+    // if priority of the thread is greater, update the maximum priority
+    if ( myPriority < currentPriority ) {
+        ((myPContext)context)->maxPriority = currentPriority;
+    }
+
+    return STATUS_SUCCESS;
+}
+
+//Get the maximum priority given a list entry of type mutex through the context
+STATUS 
+(__cdecl RecomputePriorityOnMutexes)(
+    IN PLIST_ENTRY          entry,
+    IN_OPT PVOID            context
+)
+{
+    //go over the treads waiting for the mutex
+    ForEachElementExecute(
+        &( CONTAINING_RECORD(entry, MUTEX, AcquiredMutexListElem) )->WaitingList,
+        RecomputePriorityOnList,
+        context,
+        FALSE
+    );
+
+    return STATUS_SUCCESS;
+}
+
+void 
+ThreadRecomputePriority(
+    INOUT PTHREAD Thread
+)
+{
+    //supose max priority is the real priority of the thread
+    myContext ctx = { Thread->RealPriority };
+    ctx.maxPriority = Thread->RealPriority;
+    //go over the acquired mutex list
+    ForEachElementExecute(
+        &Thread->AcquiredMutexesList,
+        RecomputePriorityOnMutexes,
+        &ctx,
+        FALSE
+    );
+
+    Thread->Priority = ctx.maxPriority;
+}
+
+void
+ThreadDonatePriority(
+    INOUT PTHREAD  currentThread,
+    INOUT PTHREAD MutexHolder
+)
+{
+
+    ASSERT( currentThread != NULL );
+    ASSERT( MutexHolder != NULL );
+
+    while (MutexHolder != NULL) {
+        if (ThreadGetPriority(currentThread) > ThreadGetPriority(MutexHolder)) {
+            MutexHolder->Priority = currentThread->Priority;
+        } else {
+            // no need to go any further
+            break;
+        }
+        //go through the chain and donate the priority if needed
+        currentThread = MutexHolder;
+        MutexHolder   = MutexHolder->WaitedMutex != NULL ? MutexHolder->WaitedMutex->Holder : NULL;
+    }
 }
