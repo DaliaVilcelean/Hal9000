@@ -1,6 +1,8 @@
 #include "HAL9000.h"
 #include "thread_internal.h"
 #include "mutex.h"
+#include "thread.h"
+#include "log.h"
 
 #define MUTEX_MAX_RECURSIVITY_DEPTH         MAX_BYTE
 
@@ -47,22 +49,38 @@ MutexAcquire(
     oldState = CpuIntrDisable();
 
     LockAcquire(&Mutex->MutexLock, &dummyState );
+
     if (NULL == Mutex->Holder)
     {
         Mutex->Holder = pCurrentThread;
         Mutex->CurrentRecursivityDepth = 1;
     }
+    // will store current thread and holders priorities
+    THREAD_PRIORITY priority;
+    THREAD_PRIORITY holderPriority;
 
     while (Mutex->Holder != pCurrentThread)
     {
-        InsertTailList(&Mutex->WaitingList, &pCurrentThread->ReadyList);
+        priority       = ThreadGetPriority( pCurrentThread );
+        holderPriority = ThreadGetPriority( Mutex->Holder );
+        // if mutex holder thread priority is lower than the priority of the current thread, donate the priority of the current thread
+        if (priority > holderPriority) {
+            ThreadDonatePriority( pCurrentThread, Mutex->Holder );
+        }
+        
+        InsertOrderedList( &Mutex->WaitingList, &pCurrentThread->ReadyList, ThreadComparePriority, NULL );
+        pCurrentThread->WaitedMutex = Mutex;
+
         ThreadTakeBlockLock();
+
         LockRelease(&Mutex->MutexLock, dummyState);
         ThreadBlock();
         LockAcquire(&Mutex->MutexLock, &dummyState );
     }
 
     _Analysis_assume_lock_acquired_(*Mutex);
+    // insert the mutex into the Aquired mutex list
+    InsertTailList( &pCurrentThread->AcquiredMutexesList, &Mutex->AcquiredMutexListElem );
 
     LockRelease(&Mutex->MutexLock, dummyState);
 
@@ -91,6 +109,9 @@ MutexRelease(
     pEntry = NULL;
 
     LockAcquire(&Mutex->MutexLock, &oldState);
+    //remove the mutex from the entry list and recompute the priority of the current thread
+    RemoveEntryList(&Mutex->AcquiredMutexListElem);
+    ThreadRecomputePriority(GetCurrentThread());
 
     pEntry = RemoveHeadList(&Mutex->WaitingList);
     if (pEntry != &Mutex->WaitingList)

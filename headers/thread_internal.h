@@ -4,6 +4,7 @@
 #include "ref_cnt.h"
 #include "ex_event.h"
 #include "thread.h"
+#include "mutex.h"
 
 typedef enum _THREAD_STATE
 {
@@ -40,8 +41,15 @@ typedef struct _THREAD
     TID                     Id;
     char*                   Name;
 
-    // Currently the thread priority is not used for anything
+    // The effective Priority of the thread
     THREAD_PRIORITY         Priority;
+    // The real priority of the thread, assigned at creation
+    THREAD_PRIORITY         RealPriority;
+    // A list of mutexes aquired by this thread
+    LIST_ENTRY              AcquiredMutexesList;
+    // The mutex that the thread is waiting for
+    PMUTEX                  WaitedMutex;
+
     THREAD_STATE            State;
 
     // valid only if State == ThreadStateTerminated
@@ -282,3 +290,45 @@ void
 ThreadSetPriority(
     IN      THREAD_PRIORITY     NewPriority
     );
+
+//******************************************************************************
+// Function:     ThreadRecomputePriority
+// Description:  Recalculates the priority of the current thread
+// Returns:      void
+// Parameter:    IN_OUT PTHREAD Thread - The thread for which the priority will be recomputed
+//******************************************************************************
+void
+ThreadRecomputePriority(
+    INOUT   PTHREAD     Thread
+);
+
+//******************************************************************************
+// Function:     ThreadDonatePriority
+// Description:  Donates the priority of the current thread to the mutex holder
+//               Do this recursevely if there is need for chain donation
+// Returns:      void
+// Parameter:     INOUT PTHREAD currentThread - the thread whose priority will be donated
+//                INOUT PTHREAD MutexHolder - the holder thread which will receive it's priority
+//******************************************************************************
+void
+ThreadDonatePriority(
+    INOUT PTHREAD  currentThread,
+    INOUT PTHREAD MutexHolder
+);
+
+//******************************************************************************
+// Function:     ThreadComparePriority
+// Description:  Compares priority of the list entries threads
+// Returns:      INT 64
+//               1,0,-1 for first smaller, equal, first bigger
+// Parameter:     IN PLIST_ENTRY first - the first entry
+//                IN PLIST_ENTRY second - the second entry
+//                IN_OPT context - the context, not used in this situation 
+//                                 it is required for the list function that calls this
+//******************************************************************************
+INT64
+(__cdecl ThreadComparePriority)(
+    IN PLIST_ENTRY first,
+    IN PLIST_ENTRY second,
+    IN_OPT PVOID context
+);
