@@ -966,22 +966,15 @@ _ThreadSetupMainThreadUserStack(
     }
     QWORD allignment = 0;
     QWORD stackSize =
-        argSize * sizeof(char) +
-        Process->NumberOfArguments * sizeof(char*) +
-        sizeof(char**) +
-        sizeof(PVOID) +
-        sizeof(QWORD) +
-        0x10;
+        argSize * sizeof(char) +                       //size of all args
+        Process->NumberOfArguments * sizeof(char*) +   //size of poiters to args
+        sizeof(char**) +                               //size of argv pointer
+        sizeof(PVOID) +                                //size of return address
+        sizeof(QWORD) +                                //size of argument count
+        0x20;                                          //shadow space addresses
 
     //allign the stack
-
-    if (stackSize % 0x10 < 8) {
-        allignment = 8 - stackSize % 0x10;
-    }
-    else if (stackSize % 0x10 > 8) {
-        allignment = 0x18 - stackSize % 0x10 + 8;
-    }
-    stackSize += allignment;
+    stackSize += stackSize % 0x10 <= 8 ? 8 - stackSize % 0x10 : 8 + (8 - stackSize % 0x10);
     //prevent page fault exception since variable pages are not yet supported
     ASSERT(stackSize < STACK_DEFAULT_SIZE);
     //set the resulting stack address
