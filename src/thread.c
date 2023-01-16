@@ -974,7 +974,7 @@ _ThreadSetupMainThreadUserStack(
         0x20;                                          //shadow space addresses
 
     //allign the stack
-    stackSize += stackSize % 0x10 <= 8 ? 8 - stackSize % 0x10 : 8 + (8 - stackSize % 0x10);
+    stackSize += stackSize % 0x10 <= 8 ? 8 - stackSize % 0x10 : 8 + (16 - stackSize % 0x10);
     //prevent page fault exception since variable pages are not yet supported
     ASSERT(stackSize < STACK_DEFAULT_SIZE);
     //set the resulting stack address
