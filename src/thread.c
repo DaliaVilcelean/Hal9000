@@ -961,17 +961,17 @@ _ThreadSetupMainThreadUserStack(
     char* token = (char*)strtok_s(NULL, " ", &args);
     QWORD argSize = 0;
     while (token != NULL) {
-        argSize += strlen(token);
+        argSize += strlen(token) + 1;
         token = (char*)strtok_s(NULL, " ", &args);
     }
-    QWORD allignment = 0;
+
     QWORD stackSize =
         argSize * sizeof(char) +                       //size of all args
         Process->NumberOfArguments * sizeof(char*) +   //size of poiters to args
         sizeof(char**) +                               //size of argv pointer
         sizeof(PVOID) +                                //size of return address
         sizeof(QWORD) +                                //size of argument count
-        0x20;                                          //shadow space addresses
+        0x10;                                          //shadow space addresses
 
     //allign the stack
     stackSize += stackSize % 0x10 <= 8 ? 8 - stackSize % 0x10 : 8 + (16 - stackSize % 0x10);
