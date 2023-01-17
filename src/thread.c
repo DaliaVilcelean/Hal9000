@@ -957,7 +957,72 @@ _ThreadSetupMainThreadUserStack(
     ASSERT(ResultingStack != NULL);
     ASSERT(Process != NULL);
 
-    *ResultingStack = InitialStack;
+    char* args = Process->FullCommandLine;
+    char* token = (char*)strtok_s(NULL, " ", &args);
+    QWORD argSize = 0;
+    while (token != NULL) {
+        argSize += strlen(token) + 1;
+        token = (char*)strtok_s(NULL, " ", &args);
+    }
+
+    QWORD stackSize =
+        argSize * sizeof(char) +                       //size of all args
+        Process->NumberOfArguments * sizeof(char*) +   //size of poiters to args
+        sizeof(char**) +                               //size of argv pointer
+        sizeof(PVOID) +                                //size of return address
+        sizeof(QWORD) +                                //size of argument count
+        0x10;                                          //shadow space addresses
+
+    //allign the stack
+    stackSize += stackSize % 0x10 <= 8 ? 8 - stackSize % 0x10 : 8 + (16 - stackSize % 0x10);
+    //prevent page fault exception since variable pages are not yet supported
+    ASSERT(stackSize < STACK_DEFAULT_SIZE);
+    //set the resulting stack address
+    *ResultingStack = (PVOID)PtrDiff(InitialStack, stackSize);
+    //stackBuffer
+    PVOID stackBuffer = NULL;
+    // map the address to kernel space
+    MmuGetSystemVirtualAddressForUserBuffer(*ResultingStack, stackSize, PAGE_RIGHTS_READWRITE, Process, &stackBuffer);
+
+    //initialize the memory with zeros
+    memzero(stackBuffer, (DWORD)stackSize);
+
+    //bottom up approach, first add the return address
+    QWORD offset = 0;
+    *(PQWORD)PtrOffset(stackBuffer, offset) = 0xDEADC0DE;
+    //add the number of arguments now
+    offset += sizeof(void*);
+    *(PQWORD)PtrOffset(stackBuffer, offset) = Process->NumberOfArguments;
+    //add the argv pointer
+    offset += sizeof(QWORD);
+    *(char***)PtrOffset(stackBuffer, offset) = (char**)PtrOffset(ResultingStack, offset + 0x10);
+    offset += sizeof(char**);
+    //add the shadowStack addresses
+    *(PQWORD)PtrOffset(stackBuffer, offset) = 0xDEADBEEF;
+    offset += sizeof(void*);
+    *(PQWORD)PtrOffset(stackBuffer, offset) = 0xDEADBEEF;
+    offset += sizeof(void*);
+
+
+    //now add the argc and argv, done simultaniously
+    args = Process->FullCommandLine;
+    token = (char*)strtok_s(NULL, " ", &args);
+    QWORD dataOffset = offset + (Process->NumberOfArguments * sizeof(char*));
+
+    while (token != NULL) {
+        //add the pointer to the argc value
+        *(char**)PtrOffset(stackBuffer, offset) = (char*)PtrOffset(*ResultingStack, dataOffset);
+        //add the value of the argc
+        strcpy((char*)PtrOffset(stackBuffer, dataOffset), token);
+
+        //add offsets
+        offset += sizeof(char*);
+        dataOffset += strlen(token) + 1;
+
+        token = (char*)strtok_s(NULL, " ", &args);
+    }
+
+    MmuFreeSystemVirtualAddressForUserBuffer((PVOID)stackBuffer);
 
     return STATUS_SUCCESS;
 }
